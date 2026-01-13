@@ -1,7 +1,7 @@
 // src/routes/municipios.js
 const express = require('express');
 const asyncHandler = require('express-async-handler');
-const Municipios = require('../Models/Municipios');
+const Municipios = require('../Models/municipios');
 
 const router = express.Router();
 
