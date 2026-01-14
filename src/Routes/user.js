@@ -99,7 +99,7 @@ router.post(
         telefono: telefono || "",
         cargo_id,
         municipio_id,
-        rol_id: rol_id ?? 2,
+        rol_id: rol_id ?? 3,
         password: hashedPassword,
       };
 
@@ -287,7 +287,7 @@ router.post(
       // Configurar cookie HttpOnly segura
       res.cookie("token", token, {
         httpOnly: true, // JavaScript NO puede leer esta cookie
-        secure: true,          //process.env.NODE_ENV === "production", // Solo HTTPS en producción
+        secure: true, //process.env.NODE_ENV === "production", // Solo HTTPS en producción
         sameSite: "none", // Protección contra CSRF
         maxAge: 8 * 60 * 60 * 1000, // 8 horas en milisegundos
       });

@@ -87,9 +87,9 @@ const Usuarios = {
   findByEmail: async (email) => {
     const query = `
     SELECT u.*, 
-           r.nombre AS rol,
-           c.nombre AS cargo,
-           m.nombre AS municipio
+          r.nombre AS rol,
+          c.nombre AS cargo,
+          m.nombre AS municipio
     FROM users u
     JOIN roles r ON r.id = u.rol_id
     JOIN cargos c ON c.id = u.cargo_id
