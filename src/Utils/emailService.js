@@ -1,15 +1,52 @@
 const nodemailer = require("nodemailer");
 
-// Configurar el transportador de correo
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || "smtp.office365.com",
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: false, // true para 465, false para otros puertos
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+// Configuraciones de proveedores de correo
+const emailProviders = {
+  office365: {
+    host: "smtp.office365.com",
+    port: 587,
+    secure: false,
   },
-});
+  gmail: {
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+  },
+  outlook: {
+    host: "smtp-mail.outlook.com",
+    port: 587,
+    secure: false,
+  },
+};
+
+// Detectar el proveedor basado en el email o configuracion
+const detectProvider = (email) => {
+  if (!email) return "office365";
+  const domain = email.split("@")[1]?.toLowerCase();
+  if (domain === "gmail.com") return "gmail";
+  if (domain === "outlook.com" || domain === "hotmail.com") return "outlook";
+  return "office365"; // Default para correos institucionales
+};
+
+// Crear transportador dinamico
+const createTransporter = (provider = null) => {
+  const emailUser = process.env.EMAIL_USER;
+  const selectedProvider = provider || process.env.EMAIL_PROVIDER || detectProvider(emailUser);
+  const config = emailProviders[selectedProvider] || emailProviders.office365;
+
+  return nodemailer.createTransport({
+    host: process.env.EMAIL_HOST || config.host,
+    port: parseInt(process.env.EMAIL_PORT) || config.port,
+    secure: config.secure,
+    auth: {
+      user: emailUser,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+};
+
+// Transportador principal
+const transporter = createTransporter();
 
 // Verificar conexion al iniciar
 transporter.verify((error, success) => {
@@ -17,6 +54,7 @@ transporter.verify((error, success) => {
     console.error("Error al configurar el correo:", error.message);
   } else {
     console.log("Servidor de correo listo para enviar mensajes");
+    console.log("Proveedor detectado:", process.env.EMAIL_PROVIDER || detectProvider(process.env.EMAIL_USER));
   }
 });
 
@@ -113,10 +151,18 @@ const enviarNotificacionTicket = async (ticketData) => {
     </html>
   `;
 
+  // Construir lista de destinatarios
+  const destinatarios = [destinatario];
+
+  // Agregar ingeniero si tiene email y esta asignado
+  if (ingeniero_email && ingeniero_email.trim() !== "") {
+    destinatarios.push(ingeniero_email);
+  }
+
   const mailOptions = {
     from: `"Sistema de Tickets" <${process.env.EMAIL_USER}>`,
     replyTo: usuario_email,
-    to: destinatario,
+    to: destinatarios.join(", "),
     subject: `Nuevo Ticket #${ticket_id} - ${tipo_soporte || "R-FAST"} - ${municipio}`,
     html: htmlContent,
   };
@@ -124,6 +170,7 @@ const enviarNotificacionTicket = async (ticketData) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log("Correo enviado:", info.messageId);
+    console.log("Destinatarios:", destinatarios.join(", "));
     return true;
   } catch (error) {
     console.error("Error al enviar correo:", error.message);
@@ -241,10 +288,18 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
     </html>
   `;
 
+  // Construir lista de destinatarios
+  const destinatarios = [destinatario];
+
+  // Agregar ingeniero si tiene email y esta asignado
+  if (ingeniero_email && ingeniero_email.trim() !== "") {
+    destinatarios.push(ingeniero_email);
+  }
+
   const mailOptions = {
     from: `"Sistema de Tickets" <${process.env.EMAIL_USER}>`,
     replyTo: usuario_email,
-    to: destinatario,
+    to: destinatarios.join(", "),
     subject: `Nota de Credito #${ticket_id} - ${centro_atencion || municipio} - ${factura_anular}`,
     html: htmlContent,
   };
@@ -252,6 +307,7 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     console.log("Correo Nota de Credito enviado:", info.messageId);
+    console.log("Destinatarios:", destinatarios.join(", "));
     return true;
   } catch (error) {
     console.error("Error al enviar correo:", error.message);
