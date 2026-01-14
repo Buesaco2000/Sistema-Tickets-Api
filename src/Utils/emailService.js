@@ -19,48 +19,124 @@ const emailProviders = {
   },
 };
 
-// Detectar el proveedor basado en el email o configuracion
-const detectProvider = (email) => {
-  if (!email) return "office365";
-  const domain = email.split("@")[1]?.toLowerCase();
-  if (domain === "gmail.com") return "gmail";
-  if (domain === "outlook.com" || domain === "hotmail.com") return "outlook";
-  return "office365"; // Default para correos institucionales
-};
-
-// Crear transportador dinamico
-const createTransporter = (provider = null) => {
-  const emailUser = process.env.EMAIL_USER;
-  const selectedProvider =
-    provider || process.env.EMAIL_PROVIDER || detectProvider(emailUser);
-  const config = emailProviders[selectedProvider] || emailProviders.office365;
+// Crear transportador para un correo especifico
+const createTransporter = (user, pass, provider) => {
+  const config = emailProviders[provider] || emailProviders.office365;
 
   return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || config.host,
-    port: parseInt(process.env.EMAIL_PORT) || config.port,
+    host: config.host,
+    port: config.port,
     secure: config.secure,
     auth: {
-      user: emailUser,
-      pass: process.env.EMAIL_PASS,
+      user: user,
+      pass: pass,
     },
   });
 };
 
-// Transportador principal
-const transporter = createTransporter();
+// Configuracion de correos disponibles
+const getEmailAccounts = () => {
+  const accounts = [];
 
-// Verificar conexion al iniciar
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("Error al configurar el correo:", error.message);
-  } else {
-    console.log("Servidor de correo listo para enviar mensajes");
-    console.log(
-      "Proveedor detectado:",
-      process.env.EMAIL_PROVIDER || detectProvider(process.env.EMAIL_USER)
-    );
+  // Correo principal (Gmail)
+  if (process.env.EMAIL_GMAIL_USER && process.env.EMAIL_GMAIL_PASS) {
+    accounts.push({
+      name: "Gmail",
+      user: process.env.EMAIL_GMAIL_USER,
+      pass: process.env.EMAIL_GMAIL_PASS,
+      provider: "gmail",
+      transporter: createTransporter(
+        process.env.EMAIL_GMAIL_USER,
+        process.env.EMAIL_GMAIL_PASS,
+        "gmail"
+      ),
+    });
   }
-});
+
+  // Correo institucional (Office 365)
+  if (process.env.EMAIL_INSTITUCIONAL_USER && process.env.EMAIL_INSTITUCIONAL_PASS) {
+    accounts.push({
+      name: "Institucional",
+      user: process.env.EMAIL_INSTITUCIONAL_USER,
+      pass: process.env.EMAIL_INSTITUCIONAL_PASS,
+      provider: "office365",
+      transporter: createTransporter(
+        process.env.EMAIL_INSTITUCIONAL_USER,
+        process.env.EMAIL_INSTITUCIONAL_PASS,
+        "office365"
+      ),
+    });
+  }
+
+  // Fallback al correo antiguo si no hay nuevos configurados
+  if (accounts.length === 0 && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    const provider = process.env.EMAIL_PROVIDER || "gmail";
+    accounts.push({
+      name: "Principal",
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+      provider: provider,
+      transporter: createTransporter(
+        process.env.EMAIL_USER,
+        process.env.EMAIL_PASS,
+        provider
+      ),
+    });
+  }
+
+  return accounts;
+};
+
+// Verificar conexiones al iniciar
+const verificarConexiones = async () => {
+  const accounts = getEmailAccounts();
+
+  if (accounts.length === 0) {
+    console.error("No hay cuentas de correo configuradas en .env");
+    return;
+  }
+
+  for (const account of accounts) {
+    try {
+      await account.transporter.verify();
+      console.log(`[${account.name}] Correo listo: ${account.user}`);
+    } catch (error) {
+      console.error(`[${account.name}] Error al configurar ${account.user}:`, error.message);
+    }
+  }
+};
+
+// Ejecutar verificacion al iniciar
+verificarConexiones();
+
+// Enviar correo con fallback automatico
+const enviarCorreo = async (mailOptions) => {
+  const accounts = getEmailAccounts();
+
+  if (accounts.length === 0) {
+    console.error("No hay cuentas de correo configuradas");
+    return { success: false, error: "No hay cuentas configuradas" };
+  }
+
+  // Intentar enviar con cada cuenta hasta que una funcione
+  for (const account of accounts) {
+    try {
+      const options = {
+        ...mailOptions,
+        from: `"Sistema de Tickets" <${account.user}>`,
+      };
+
+      const info = await account.transporter.sendMail(options);
+      console.log(`[${account.name}] Correo enviado:`, info.messageId);
+      return { success: true, messageId: info.messageId, account: account.name };
+    } catch (error) {
+      console.error(`[${account.name}] Fallo al enviar:`, error.message);
+      // Continuar con la siguiente cuenta
+    }
+  }
+
+  return { success: false, error: "Todas las cuentas fallaron" };
+};
 
 /**
  * Enviar notificacion de nuevo ticket (R-FAST / Otros Soportes)
@@ -166,7 +242,6 @@ const enviarNotificacionTicket = async (ticketData) => {
   }
 
   const mailOptions = {
-    from: `"Sistema de Tickets" <${process.env.EMAIL_USER}>`,
     replyTo: usuario_email,
     to: destinatarios.join(", "),
     subject: `Nuevo Ticket #${ticket_id} - ${
@@ -175,15 +250,11 @@ const enviarNotificacionTicket = async (ticketData) => {
     html: htmlContent,
   };
 
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Correo enviado:", info.messageId);
+  const result = await enviarCorreo(mailOptions);
+  if (result.success) {
     console.log("Destinatarios:", destinatarios.join(", "));
-    return true;
-  } catch (error) {
-    console.error("Error al enviar correo:", error.message);
-    return false;
   }
+  return result.success;
 };
 
 /**
@@ -313,7 +384,6 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
   }
 
   const mailOptions = {
-    from: `"Sistema de Tickets" <${process.env.EMAIL_USER}>`,
     replyTo: usuario_email,
     to: destinatarios.join(", "),
     subject: `Nota de Credito #${ticket_id} - ${
@@ -322,15 +392,11 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
     html: htmlContent,
   };
 
-  try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Correo Nota de Credito enviado:", info.messageId);
+  const result = await enviarCorreo(mailOptions);
+  if (result.success) {
     console.log("Destinatarios:", destinatarios.join(", "));
-    return true;
-  } catch (error) {
-    console.error("Error al enviar correo:", error.message);
-    return false;
   }
+  return result.success;
 };
 
 module.exports = {
