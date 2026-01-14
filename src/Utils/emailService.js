@@ -31,7 +31,8 @@ const detectProvider = (email) => {
 // Crear transportador dinamico
 const createTransporter = (provider = null) => {
   const emailUser = process.env.EMAIL_USER;
-  const selectedProvider = provider || process.env.EMAIL_PROVIDER || detectProvider(emailUser);
+  const selectedProvider =
+    provider || process.env.EMAIL_PROVIDER || detectProvider(emailUser);
   const config = emailProviders[selectedProvider] || emailProviders.office365;
 
   return nodemailer.createTransport({
@@ -54,7 +55,10 @@ transporter.verify((error, success) => {
     console.error("Error al configurar el correo:", error.message);
   } else {
     console.log("Servidor de correo listo para enviar mensajes");
-    console.log("Proveedor detectado:", process.env.EMAIL_PROVIDER || detectProvider(process.env.EMAIL_USER));
+    console.log(
+      "Proveedor detectado:",
+      process.env.EMAIL_PROVIDER || detectProvider(process.env.EMAIL_USER)
+    );
   }
 });
 
@@ -116,7 +120,9 @@ const enviarNotificacionTicket = async (ticketData) => {
 
           <div class="field">
             <div class="label">Ingeniero Asignado:</div>
-            <div class="value ingeniero">${ingeniero_nombre || "No asignado"}<br><small>${ingeniero_email || ""}</small></div>
+            <div class="value ingeniero">${
+              ingeniero_nombre || "No asignado"
+            }<br><small>${ingeniero_email || ""}</small></div>
           </div>
 
           <div class="field">
@@ -163,7 +169,9 @@ const enviarNotificacionTicket = async (ticketData) => {
     from: `"Sistema de Tickets" <${process.env.EMAIL_USER}>`,
     replyTo: usuario_email,
     to: destinatarios.join(", "),
-    subject: `Nuevo Ticket #${ticket_id} - ${tipo_soporte || "R-FAST"} - ${municipio}`,
+    subject: `Nuevo Ticket #${ticket_id} - ${
+      tipo_soporte || "R-FAST"
+    } - ${municipio}`,
     html: htmlContent,
   };
 
@@ -241,7 +249,9 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
 
           <div class="field">
             <div class="label">Ingeniero Asignado:</div>
-            <div class="value ingeniero">${ingeniero_nombre || "No asignado"}<br><small>${ingeniero_email || ""}</small></div>
+            <div class="value ingeniero">${
+              ingeniero_nombre || "No asignado"
+            }<br><small>${ingeniero_email || ""}</small></div>
           </div>
 
           <div class="field">
@@ -256,12 +266,16 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
 
           <div class="field">
             <div class="label">Factura a Anular:</div>
-            <div class="value highlight">${factura_anular || "No especificada"}</div>
+            <div class="value highlight">${
+              factura_anular || "No especificada"
+            }</div>
           </div>
 
           <div class="field">
             <div class="label">Factura Copago a Anular:</div>
-            <div class="value">${factura_copago_anular || "No especificada"}</div>
+            <div class="value">${
+              factura_copago_anular || "No especificada"
+            }</div>
           </div>
 
           <div class="field">
@@ -276,7 +290,9 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
 
           <div class="field">
             <div class="label">Motivo:</div>
-            <div class="value highlight">${motivo || "Sin motivo especificado"}</div>
+            <div class="value highlight">${
+              motivo || "Sin motivo especificado"
+            }</div>
           </div>
         </div>
         <div class="footer">
@@ -300,7 +316,9 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
     from: `"Sistema de Tickets" <${process.env.EMAIL_USER}>`,
     replyTo: usuario_email,
     to: destinatarios.join(", "),
-    subject: `Nota de Credito #${ticket_id} - ${centro_atencion || municipio} - ${factura_anular}`,
+    subject: `Nota de Credito #${ticket_id} - ${
+      centro_atencion || municipio
+    } - ${factura_anular}`,
     html: htmlContent,
   };
 
