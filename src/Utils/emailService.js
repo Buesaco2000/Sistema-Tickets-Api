@@ -1,141 +1,47 @@
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
-// Configuraciones de proveedores de correo
-const emailProviders = {
-  office365: {
-    host: "smtp.office365.com",
-    port: 587,
-    secure: false,
-  },
-  gmail: {
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-  },
-  outlook: {
-    host: "smtp-mail.outlook.com",
-    port: 587,
-    secure: false,
-  },
-};
+// Inicializar Resend con API Key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Crear transportador para un correo especifico
-const createTransporter = (user, pass, provider) => {
-  const config = emailProviders[provider] || emailProviders.office365;
+// Email remitente (debe ser verificado en Resend o usar onboarding@resend.dev para pruebas)
+const FROM_EMAIL = process.env.EMAIL_FROM || "onboarding@resend.dev";
+const FROM_NAME = "Sistema de Tickets SurOriente";
 
-  return nodemailer.createTransport({
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    auth: {
-      user: user,
-      pass: pass,
-    },
-  });
-};
+// Verificar configuracion al iniciar
+if (process.env.RESEND_API_KEY) {
+  console.log("[Resend] Servicio de correo configurado correctamente");
+} else {
+  console.error("[Resend] RESEND_API_KEY no esta configurado en .env");
+}
 
-// Configuracion de correos disponibles
-const getEmailAccounts = () => {
-  const accounts = [];
-
-  // Correo principal (Gmail)
-  if (process.env.EMAIL_GMAIL_USER && process.env.EMAIL_GMAIL_PASS) {
-    accounts.push({
-      name: "Gmail",
-      user: process.env.EMAIL_GMAIL_USER,
-      pass: process.env.EMAIL_GMAIL_PASS,
-      provider: "gmail",
-      transporter: createTransporter(
-        process.env.EMAIL_GMAIL_USER,
-        process.env.EMAIL_GMAIL_PASS,
-        "gmail"
-      ),
-    });
-  }
-
-  // Correo institucional (Office 365)
-  if (process.env.EMAIL_INSTITUCIONAL_USER && process.env.EMAIL_INSTITUCIONAL_PASS) {
-    accounts.push({
-      name: "Institucional",
-      user: process.env.EMAIL_INSTITUCIONAL_USER,
-      pass: process.env.EMAIL_INSTITUCIONAL_PASS,
-      provider: "office365",
-      transporter: createTransporter(
-        process.env.EMAIL_INSTITUCIONAL_USER,
-        process.env.EMAIL_INSTITUCIONAL_PASS,
-        "office365"
-      ),
-    });
-  }
-
-  // Fallback al correo antiguo si no hay nuevos configurados
-  if (accounts.length === 0 && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-    const provider = process.env.EMAIL_PROVIDER || "gmail";
-    accounts.push({
-      name: "Principal",
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-      provider: provider,
-      transporter: createTransporter(
-        process.env.EMAIL_USER,
-        process.env.EMAIL_PASS,
-        provider
-      ),
-    });
-  }
-
-  return accounts;
-};
-
-// Verificar conexiones al iniciar
-const verificarConexiones = async () => {
-  const accounts = getEmailAccounts();
-
-  if (accounts.length === 0) {
-    console.error("No hay cuentas de correo configuradas en .env");
-    return;
-  }
-
-  for (const account of accounts) {
-    try {
-      await account.transporter.verify();
-      console.log(`[${account.name}] Correo listo: ${account.user}`);
-    } catch (error) {
-      console.error(`[${account.name}] Error al configurar ${account.user}:`, error.message);
-    }
-  }
-};
-
-// Ejecutar verificacion al iniciar
-verificarConexiones();
-
-// Enviar correo con fallback automatico
+// Enviar correo usando Resend
 const enviarCorreo = async (mailOptions) => {
-  const accounts = getEmailAccounts();
+  try {
+    const { to, subject, html, replyTo } = mailOptions;
 
-  if (accounts.length === 0) {
-    console.error("No hay cuentas de correo configuradas");
-    return { success: false, error: "No hay cuentas configuradas" };
-  }
+    // Convertir destinatarios a array si es string
+    const destinatarios =
+      typeof to === "string" ? to.split(",").map((e) => e.trim()) : to;
 
-  // Intentar enviar con cada cuenta hasta que una funcione
-  for (const account of accounts) {
-    try {
-      const options = {
-        ...mailOptions,
-        from: `"Sistema de Tickets" <${account.user}>`,
-      };
+    const { data, error } = await resend.emails.send({
+      from: `${FROM_NAME} <${FROM_EMAIL}>`,
+      to: destinatarios,
+      subject: subject,
+      html: html,
+      reply_to: replyTo,
+    });
 
-      const info = await account.transporter.sendMail(options);
-      console.log(`[${account.name}] Correo enviado:`, info.messageId);
-      return { success: true, messageId: info.messageId, account: account.name };
-    } catch (error) {
-      console.error(`[${account.name}] Fallo al enviar:`, error.message);
-      // Continuar con la siguiente cuenta
+    if (error) {
+      console.error("[Resend] Error al enviar:", error.message);
+      return { success: false, error: error.message };
     }
-  }
 
-  return { success: false, error: "Todas las cuentas fallaron" };
+    console.log("[Resend] Correo enviado:", data.id);
+    return { success: true, messageId: data.id };
+  } catch (error) {
+    console.error("[Resend] Error:", error.message);
+    return { success: false, error: error.message };
+  }
 };
 
 /**
@@ -243,7 +149,7 @@ const enviarNotificacionTicket = async (ticketData) => {
 
   const mailOptions = {
     replyTo: usuario_email,
-    to: destinatarios.join(", "),
+    to: destinatarios,
     subject: `Nuevo Ticket #${ticket_id} - ${
       tipo_soporte || "R-FAST"
     } - ${municipio}`,
@@ -385,7 +291,7 @@ const enviarNotificacionNotaCredito = async (ticketData) => {
 
   const mailOptions = {
     replyTo: usuario_email,
-    to: destinatarios.join(", "),
+    to: destinatarios,
     subject: `Nota de Credito #${ticket_id} - ${
       centro_atencion || municipio
     } - ${factura_anular}`,
