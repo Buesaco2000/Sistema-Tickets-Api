@@ -1,0 +1,455 @@
+//
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+//////////////////////////////////////////////////////
+// ENUMS
+//////////////////////////////////////////////////////
+
+enum Prioridad {
+  BAJA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum EstadoScope {
+  TICKET
+  MANTENIMIENTO
+}
+
+//////////////////////////////////////////////////////
+// CORE
+//////////////////////////////////////////////////////
+model Empresa {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users     User[]
+  sedes     Sede[]
+  tickets   Ticket[]
+  equipos   EquipoBiomedico[]
+
+  @@map("empresa")
+}
+
+model Municipio {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sedes     Sede[]
+  users     User[]
+
+  @@map("municipios")
+}
+
+model Sede {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  municipioId Int      @map("municipio_id")
+  empresaId   Int      @map("empresa_id")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  empresa     Empresa  @relation(fields: [empresaId], references: [id])
+  municipio   Municipio @relation(fields: [municipioId], references: [id])
+
+  @@unique([nombre, empresaId])
+  @@index([municipioId])
+  @@index([empresaId])
+
+  @@map("sedes")
+}
+
+//////////////////////////////////////////////////////
+// SEGURIDAD
+//////////////////////////////////////////////////////
+
+model Rol {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique
+
+  @@map("roles")
+}
+
+model Cargo {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique
+
+  @@map("cargos")
+}
+
+model User {
+  id          Int     @id @default(autoincrement())
+  nombres     String
+  apellidos   String
+  email       String
+  telefono    String?
+  password    String
+
+  empresaId   Int     @map("empresa_id")
+  rolId       Int?    @map("rol_id")
+  cargoId     Int?    @map("cargo_id")
+  municipioId Int?    @map("municipio_id")
+
+  activo      Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime? @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  empresa     Empresa @relation(fields: [empresaId], references: [id])
+
+  @@unique([email, empresaId])
+  @@index([empresaId])
+  @@index([empresaId, activo])
+
+  @@map("users")
+}
+
+//////////////////////////////////////////////////////
+// CATALOGOS
+//////////////////////////////////////////////////////
+
+model TipoSoporte {
+  id              Int     @id @default(autoincrement())
+  nombre          String  @unique
+  requiereDetalle Boolean @default(false) @map("requiere_detalle")
+
+  @@map("tipos_soporte")
+}
+
+model Estado {
+  id     Int         @id @default(autoincrement())
+  nombre String
+  scope  EstadoScope
+
+  @@unique([nombre, scope])
+  @@map("estados")
+}
+
+//////////////////////////////////////////////////////
+// EQUIPOS
+//////////////////////////////////////////////////////
+
+model EquipoBiomedico {
+  id          Int     @id @default(autoincrement())
+
+  empresaId   Int     @map("empresa_id")
+  sedeId      Int?    @map("sede_id")
+  municipioId Int?    @map("municipio_id")
+
+  repuestosPreventivos   RepuestoPreventivo[]
+  documentos             Documento[]
+  preventivos            MantenimientoPreventivo[]
+  correctivos            MantenimientoCorrectivo[]
+  caracteristica         CaracteristicaTecnica?
+
+  nombre      String
+  serie       String
+  marca       String?
+
+  activo      Boolean @default(true)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime? @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  empresa     Empresa @relation(fields: [empresaId], references: [id])
+
+  @@unique([empresaId, serie]) // 🔥 MULTI-TENANT FIX
+  @@index([empresaId])
+  @@index([activo])
+
+  @@map("equipos_biomedicos")
+}
+
+//////////////////////////////////////////////////////
+// TICKETS
+//////////////////////////////////////////////////////
+
+model Ticket {
+  id                     Int      @id @default(autoincrement())
+
+  empresaId              Int      @map("empresa_id")
+  municipioIncidenteId   Int      @map("municipio_incidente_id")
+  tipoSoporteId          Int      @map("tipo_soporte_id")
+  equipoId               Int?     @map("equipo_id")
+  estadoId               Int      @map("estado_id")
+
+  prioridad              Prioridad @default(MEDIA)
+
+  fechaCierre            DateTime? @map("fecha_cierre")
+
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime? @map("updated_at")
+  deletedAt              DateTime? @map("deleted_at")
+
+  empresa                Empresa @relation(fields: [empresaId], references: [id])
+
+  @@index([empresaId])
+  @@index([estadoId])
+  @@index([equipoId])
+  @@index([createdAt])
+  @@index([empresaId, estadoId])
+
+  @@map("tickets")
+}
+
+//////////////////////////////////////////////////////
+// RELACION TICKET - USUARIOS
+//////////////////////////////////////////////////////
+
+model TicketUsuario {
+  id           Int @id @default(autoincrement())
+  ticketId     Int @map("ticket_id")
+  userId       Int @map("user_id")
+  empresaId    Int @map("empresa_id")
+  rolTicketId  Int? @map("rol_ticket_id")
+
+  @@unique([ticketId, userId])
+
+  @@index([empresaId])
+  @@index([userId])
+
+  @@map("ticket_usuarios")
+}
+
+//////////////////////////////////////////////////////
+// HISTORIAL
+//////////////////////////////////////////////////////
+
+model TicketHistorialEstado {
+  id        Int      @id @default(autoincrement())
+  ticketId  Int      @map("ticket_id")
+  estadoId  Int      @map("estado_id")
+  changedBy Int?     @map("changed_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@index([ticketId, createdAt])
+
+  @@map("ticket_historial_estado")
+}
+
+//////////////////////////////////////////////////////
+// SOPORTES
+//////////////////////////////////////////////////////
+
+model Soporte {
+  id            Int @id @default(autoincrement())
+  empresaId     Int @map("empresa_id")
+  ticketId      Int @map("ticket_id")
+  tipoSoporteId Int? @map("tipo_soporte_id")
+
+  descripcion   String?
+  imagenUrl     String? @map("imagen_url")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  @@index([ticketId])
+
+  @@map("soportes")
+}
+
+//////////////////////////////////////////////////////
+// AUDITORIA
+//////////////////////////////////////////////////////
+
+model AuditLog {
+  id              BigInt  @id @default(autoincrement())
+  empresaId       Int     @map("empresa_id")
+  tabla           String
+  registroId      BigInt  @map("registro_id")
+  accion          String
+  usuarioId       Int?    @map("usuario_id")
+
+  datosAnteriores Json?   @map("datos_anteriores")
+  datosNuevos     Json?   @map("datos_nuevos")
+
+  ip              String?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([empresaId, createdAt])
+  @@index([tabla, registroId])
+
+  @@map("audit_log")
+}
+
+//////////////////////////////////////////////////////
+// MANTENIMIENTO
+//////////////////////////////////////////////////////
+model MantenimientoPreventivo {
+  id                   Int      @id @default(autoincrement())
+
+  empresaId            Int      @map("empresa_id")
+  equipoId             Int      @map("equipo_id")
+
+  descripcion          String?
+  numeroInventario     Int      @map("numero_inventario")
+  tiempoHoras          Int      @default(0) @map("tiempo_horas")
+  tiempoMinutos        Int      @default(0) @map("tiempo_minutos")
+
+  fechaMantenimiento   DateTime @map("fecha_mantenimiento")
+  numeroMantenimiento  Int      @map("numero_mantenimiento")
+
+  bioseguridadVerificada Boolean @default(false) @map("bioseguridad_verificada")
+  equipoLimpio           Boolean @default(false) @map("equipo_limpio")
+
+  observaciones        String?
+
+  realizadoPorId       Int? @map("realizado_por")
+  aprobadoPorId        Int? @map("aprobado_por")
+
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime? @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
+
+  empresa              Empresa @relation(fields: [empresaId], references: [id])
+  equipo               EquipoBiomedico @relation(fields: [equipoId], references: [id])
+
+  repuestos            RepuestoPreventivo[]
+  herramientas         Herramienta[]
+  insumos              Insumo[]
+  actividades          MantenimientoActividad[]
+
+  @@unique([empresaId, equipoId, numeroMantenimiento])
+  @@index([equipoId])
+  @@index([empresaId, fechaMantenimiento])
+
+  @@map("mantenimientos_preventivos")
+}
+
+enum TipoServicio {
+  CORRECTIVO
+  PREVENTIVO
+  INSTALACION
+  LLAMADO_EMERGENCIA
+  REVISION
+  ACTUALIZACION
+}
+
+model MantenimientoCorrectivo {
+  id              Int      @id @default(autoincrement())
+
+  empresaId       Int      @map("empresa_id")
+  equipoId        Int      @map("equipo_id")
+  estadoId        Int      @map("estado_id")
+
+  tipoServicio    TipoServicio? @map("tipo_servicio")
+
+  fechaInicio     DateTime @map("fecha_inicio")
+  fechaEntrega    DateTime @map("fecha_entrega")
+
+  fallaReportada  String   @map("falla_reportada")
+  accionCorrectiva String  @map("accion_correctiva")
+
+  seInstalaronPartes Boolean @default(false) @map("se_instalaron_partes")
+
+  duracionHoras   Int? @map("duracion_horas")
+  duracionMinutos Int? @map("duracion_minutos")
+
+  costoServicio   Float? @map("costo_servicio")
+
+  observaciones   String?
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime? @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  repuestos       RepuestoCorrectivo[]
+
+  @@index([equipoId])
+  @@index([empresaId, estadoId])
+
+  @@map("mantenimientos_correctivos")
+}
+
+model CatalogoRepuesto {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique
+
+  repuestosPreventivos RepuestoPreventivo[]
+  repuestosCorrectivos RepuestoCorrectivo[]
+
+  @@map("catalogo_repuestos")
+}
+
+model RepuestoPreventivo {
+  id            Int @id @default(autoincrement())
+  preventivoId  Int @map("preventivo_id")
+  repuestoId    Int? @map("repuesto_id")
+  cantidad      Int?
+  verificacion  String? @map("verificacion_estado")
+
+  preventivo    MantenimientoPreventivo @relation(fields: [preventivoId], references: [id])
+  repuesto      CatalogoRepuesto? @relation(fields: [repuestoId], references: [id])
+
+  @@map("repuestos_preventivos")
+}
+
+model RepuestoCorrectivo {
+  id           Int @id @default(autoincrement())
+  correctivoId Int @map("correctivo_id")
+  repuestoId   Int? @map("repuesto_id")
+  descripcion  String?
+  cantidad     Int
+
+  correctivo   MantenimientoCorrectivo @relation(fields: [correctivoId], references: [id])
+  repuesto     CatalogoRepuesto? @relation(fields: [repuestoId], references: [id])
+
+  @@map("repuestos_correctivos")
+}
+
+model TipoDocumento {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique
+
+  documentos Documento[]
+
+  @@map("tipos_documento")
+}
+
+model Documento {
+  id               Int @id @default(autoincrement())
+  equipoId         Int @map("equipo_id")
+  tipoDocumentoId  Int @map("tipo_documento_id")
+  url              String?
+
+  equipo           EquipoBiomedico @relation(fields: [equipoId], references: [id])
+  tipoDocumento    TipoDocumento @relation(fields: [tipoDocumentoId], references: [id])
+
+  @@map("documentos")
+}
+
+model CaracteristicaTecnica {
+  id                  Int @id @default(autoincrement())
+  equipoId            Int @unique @map("equipo_id")
+
+  fuenteEnergia       String?
+  voltaje             Float?
+  corrienteMaxima     Float?
+  potencia            Float?
+
+  vidaUtil            Int? @map("vida_util")
+
+  requiereAgua        Boolean? @map("requiere_agua")
+  requiereGas         Boolean? @map("requiere_gas")
+
+  equipo              EquipoBiomedico @relation(fields: [equipoId], references: [id])
+
+  @@map("caracteristicas_tecnicas")
+}
