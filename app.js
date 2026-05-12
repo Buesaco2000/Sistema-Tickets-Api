@@ -112,6 +112,7 @@ v1.use("/mantenimientos/catalogos/respuestos", require("./src/Modules/mantenimie
 v1.use("/mantenimientos/catalogos/herramientas", require("./src/Modules/mantenimientos/catalogos/herramientas.routes.js"));
 v1.use("/mantenimientos/catalogos/insumos", require("./src/Modules/mantenimientos/catalogos/insumos.routes.js"));
 v1.use("/mantenimientos/catalogos/actividades", require("./src/Modules/mantenimientos/catalogos/actividades.routes.js"));
+v1.use("/mantenimientos/catalogos/verificaciones", require("./src/Modules/mantenimientos/catalogos/verificaciones.routes.js"));
 
 // RUTAS DE CARPETA USUARIOS
 v1.use("/users",                      require("./src/Modules/users/user.routes.js"));

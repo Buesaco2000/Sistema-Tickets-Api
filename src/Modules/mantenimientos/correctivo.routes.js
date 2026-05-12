@@ -35,8 +35,7 @@ const createSchema = z.object({
       descripcion:  z.string().optional().nullable(),
       cantidad:     z.number().int().min(1),
     })).optional(),
-    imagen_antes:   z.string().optional().nullable(),
-    imagen_despues: z.string().optional().nullable(),
+
   }),
 });
 

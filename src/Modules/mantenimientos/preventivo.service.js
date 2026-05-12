@@ -102,7 +102,16 @@ const findById = async (id, empresaId) => {
     [id]
   );
 
-  return { ...row, repuestos, herramientas, insumos, actividades };
+  const [verificaciones] = await pool.query(
+    `SELECT cvp.id, cvp.nombre
+     FROM verificacion_preventivo vp
+     JOIN catalogo_verificacion_preventivo cvp ON cvp.id = vp.catalogo_verificacion_id
+     WHERE vp.preventivo_id = ?
+     ORDER BY cvp.id`,
+    [id]
+  );
+
+  return { ...row, repuestos, herramientas, insumos, actividades, verificaciones };
 };
 
 const create = async (data, userId, empresaId) => {
@@ -110,7 +119,7 @@ const create = async (data, userId, empresaId) => {
     equipo_id, descripcion, numero_inventario, tiempo_horas, tiempo_minutos,
     fecha_mantenimiento, numero_mantenimiento, bioseguridad_verificada, equipo_limpio,
     observaciones, realizado_por, aprobado_por,
-    repuestos, herramientas, insumos, actividades,
+    repuestos, herramientas, insumos, actividades, verificaciones,
   } = data;
 
   const conn = await pool.getConnection();
@@ -183,6 +192,15 @@ const create = async (data, userId, empresaId) => {
       }
     }
 
+    if (Array.isArray(verificaciones) && verificaciones.length) {
+      for (const vId of verificaciones) {
+        await conn.query(
+          'INSERT IGNORE INTO verificacion_preventivo (preventivo_id, catalogo_verificacion_id) VALUES (?,?)',
+          [prevId, vId]
+        );
+      }
+    }
+
     await conn.commit();
     return findById(prevId, empresaId);
   } catch (err) {
@@ -212,15 +230,27 @@ const update = async (id, data, userId, empresaId) => {
     }
   }
 
-  if (!fields.length) throw new AppError('Sin campos para actualizar.', 400);
+  const hasVerificaciones = Array.isArray(data.verificaciones);
+  if (!fields.length && !hasVerificaciones) throw new AppError('Sin campos para actualizar.', 400);
 
-  fields.push('updated_at = NOW()');
-  values.push(id, empresaId);
+  if (fields.length) {
+    fields.push('updated_at = NOW()');
+    values.push(id, empresaId);
+    await pool.query(
+      `UPDATE mantenimientos_preventivos SET ${fields.join(', ')} WHERE id = ? AND empresa_id = ?`,
+      values
+    );
+  }
 
-  await pool.query(
-    `UPDATE mantenimientos_preventivos SET ${fields.join(', ')} WHERE id = ? AND empresa_id = ?`,
-    values
-  );
+  if (hasVerificaciones) {
+    await pool.query('DELETE FROM verificacion_preventivo WHERE preventivo_id = ?', [id]);
+    for (const vId of data.verificaciones) {
+      await pool.query(
+        'INSERT IGNORE INTO verificacion_preventivo (preventivo_id, catalogo_verificacion_id) VALUES (?,?)',
+        [id, vId]
+      );
+    }
+  }
 
   return findById(id, empresaId);
 };

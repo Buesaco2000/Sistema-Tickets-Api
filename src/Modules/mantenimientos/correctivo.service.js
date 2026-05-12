@@ -92,23 +92,20 @@ const create = async (data, userId, empresaId) => {
       `INSERT INTO mantenimientos_correctivos (
         empresa_id, equipo_id, estado_id, tipo_servicio, fecha_inicio, falla_reportada,
         accion_correctiva, se_instalaron_partes, observaciones, fecha_entrega,
-        duracion_horas, duracion_minutos, costo_servicio, realizado_por, aprobado_por,
-        imagen_antes, imagen_despues
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        duracion_horas, duracion_minutos, costo_servicio, realizado_por, aprobado_por
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId, equipo_id, estado_id,
-        tipo_servicio       || null,
-        fecha_inicio,        falla_reportada,
-        accion_correctiva,   se_instalaron_partes ?? false,
-        observaciones       || null,
+        tipo_servicio    || null,
+        fecha_inicio,      falla_reportada,
+        accion_correctiva, se_instalaron_partes ?? false,
+        observaciones    || null,
         fecha_entrega,
-        duracion_horas      ?? null,
-        duracion_minutos    ?? null,
-        costo_servicio      ?? null,
-        realizado_por       || null,
-        aprobado_por        || null,
-        data.imagen_antes   || null,
-        data.imagen_despues || null,
+        duracion_horas   ?? null,
+        duracion_minutos ?? null,
+        costo_servicio   ?? null,
+        realizado_por    || null,
+        aprobado_por     || null,
       ]
     );
     const corrId = result.insertId;

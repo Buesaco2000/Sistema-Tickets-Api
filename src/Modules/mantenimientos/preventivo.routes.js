@@ -38,6 +38,7 @@ const createSchema = z.object({
       cantidad:  z.number().int().min(0).optional().nullable(),
     })).optional(),
     actividades: z.array(z.number().int().positive()).optional(),
+    verificaciones: z.array(z.number().int().positive()).optional(),
     imagen_antes:   z.string().optional().nullable(),
     imagen_despues: z.string().optional().nullable(),
   }),
