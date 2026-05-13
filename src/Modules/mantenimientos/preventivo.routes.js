@@ -6,6 +6,7 @@ const { authorize }    = require('../../middlewares/rbac.middleware');
 const validate         = require('../../middlewares/validate.middleware');
 const ROLES            = require('../../utils/roles');
 const { uploadMantImagen } = require('../../utils/uploadFile');
+const pool             = require('../../config/database');
 
 const idParam = z.object({
   params: z.object({ id: z.string().regex(/^\d+$/).transform(Number) }),
@@ -19,7 +20,7 @@ const createSchema = z.object({
     numero_mantenimiento:    z.number().int().positive(),
     tiempo_horas:            z.number().int().min(0).optional().default(0),
     tiempo_minutos:          z.number().int().min(0).max(59).optional().default(0),
-    descripcion:             z.string().optional().nullable(),
+    servicio: z.string().optional().nullable(),
     bioseguridad_verificada: z.boolean().optional(),
     equipo_limpio:           z.boolean().optional(),
     observaciones:           z.string().optional().nullable(),
@@ -39,12 +40,24 @@ const createSchema = z.object({
     })).optional(),
     actividades: z.array(z.number().int().positive()).optional(),
     verificaciones: z.array(z.number().int().positive()).optional(),
-    imagen_antes:   z.string().optional().nullable(),
-    imagen_despues: z.string().optional().nullable(),
+    imagen_antes:    z.string().optional().nullable(),
+    imagen_despues:  z.string().optional().nullable(),
+    firma_realizado: z.string().optional().nullable(),
+    firma_aprobado:  z.string().optional().nullable(),
   }),
 });
 
 router.use(authenticate);
+
+router.get('/tecnicos', authorize(ROLES.ADMIN, ROLES.INGENIERO), async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, nombres, apellidos FROM users WHERE empresa_id = ? AND deleted_at IS NULL AND activo = 1 ORDER BY nombres ASC`,
+      [req.user.empresa_id]
+    );
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
 
 router.post('/upload-imagen', authorize(ROLES.ADMIN, ROLES.INGENIERO), uploadMantImagen.single('file'), ctrl.uploadImagen);
 router.get('/',    ctrl.getAll);

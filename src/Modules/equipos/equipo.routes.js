@@ -77,6 +77,10 @@ const createSchema = z.object({
           tipo_documento_id: z.number().int().positive(),
           url:               z.string().url().optional().nullable(),
         }),
+        z.object({
+          tipo: z.string(),
+          url:  z.string().nullable().optional(),
+        }),
       ])
     ).optional(),
     soporte_tecnico: z.object({

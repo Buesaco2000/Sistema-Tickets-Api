@@ -383,7 +383,7 @@ const create = async (data, userId, empresaId) => {
       }
     }
 
-    // ── Documentos (accept string names OR {tipo_documento_id} objects) ────────
+    // ── Documentos (accept strings, {tipo_documento_id,url}, or {tipo,url}) ───
     const docsPayload = Array.isArray(data.documentos) ? data.documentos : [];
     for (const doc of docsPayload) {
       let tid = null;
@@ -391,6 +391,8 @@ const create = async (data, userId, empresaId) => {
         tid = await lookupId(conn, 'tipos_documento', doc);
       } else if (doc?.tipo_documento_id) {
         tid = doc.tipo_documento_id;
+      } else if (doc?.tipo) {
+        tid = await lookupId(conn, 'tipos_documento', doc.tipo);
       }
       if (tid) {
         await conn.query(

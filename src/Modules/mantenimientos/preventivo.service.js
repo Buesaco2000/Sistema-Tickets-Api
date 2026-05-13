@@ -116,7 +116,7 @@ const findById = async (id, empresaId) => {
 
 const create = async (data, userId, empresaId) => {
   const {
-    equipo_id, descripcion, numero_inventario, tiempo_horas, tiempo_minutos,
+    equipo_id, servicio, numero_inventario, tiempo_horas, tiempo_minutos,
     fecha_mantenimiento, numero_mantenimiento, bioseguridad_verificada, equipo_limpio,
     observaciones, realizado_por, aprobado_por,
     repuestos, herramientas, insumos, actividades, verificaciones,
@@ -135,14 +135,16 @@ const create = async (data, userId, empresaId) => {
 
     const [result] = await conn.query(
       `INSERT INTO mantenimientos_preventivos (
-        empresa_id, equipo_id, descripcion, numero_inventario,
+        empresa_id, equipo_id, servicio, numero_inventario,
         tiempo_horas, tiempo_minutos, fecha_mantenimiento, numero_mantenimiento,
         bioseguridad_verificada, equipo_limpio, observaciones,
-        realizado_por, aprobado_por, imagen_antes, imagen_despues
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        realizado_por, aprobado_por, imagen_antes, imagen_despues,
+        firma_realizado, firma_aprobado
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId, equipo_id,
-        descripcion         || null, numero_inventario,
+        servicio            || null,
+        numero_inventario,
         tiempo_horas        || 0,    tiempo_minutos     || 0,
         fecha_mantenimiento, numero_mantenimiento,
         bioseguridad_verificada ?? false,
@@ -152,6 +154,8 @@ const create = async (data, userId, empresaId) => {
         aprobado_por        || null,
         data.imagen_antes   || null,
         data.imagen_despues || null,
+        data.firma_realizado || null,
+        data.firma_aprobado  || null,
       ]
     );
     const prevId = result.insertId;
@@ -215,10 +219,10 @@ const update = async (id, data, userId, empresaId) => {
   await findById(id, empresaId);
 
   const allowed = [
-    'descripcion', 'numero_inventario', 'tiempo_horas', 'tiempo_minutos',
+    'servicio', 'numero_inventario', 'tiempo_horas', 'tiempo_minutos',
     'fecha_mantenimiento', 'numero_mantenimiento', 'bioseguridad_verificada',
     'equipo_limpio', 'observaciones', 'realizado_por', 'aprobado_por',
-    'imagen_antes', 'imagen_despues',
+    'imagen_antes', 'imagen_despues', 'firma_realizado', 'firma_aprobado',
   ];
   const fields = [];
   const values = [];
