@@ -11,6 +11,10 @@ const {
 
 const app = express();
 
+// Necesario para que express-rate-limit y los logs de morgan
+// usen la IP real del cliente cuando hay nginx/proxy delante.
+app.set("trust proxy", 1);
+
 //------SECURITY MIDDLEWARES------//
 app.use(helmet());
 
@@ -34,17 +38,24 @@ const globalLimiter = rateLimit({
   max: 200,
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Demasiadas peticiones, intente más tarde.",
-  },
+  message: { success: false, message: "Demasiadas peticiones, intente más tarde." },
 });
 
+// Límite estricto solo para login y refresh — previene fuerza bruta
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Demasiados intentos, espere 15 minutos." },
+});
 
 app.use("/api/", globalLimiter);
+app.use("/api/v1/auth/login",   authLimiter);
+app.use("/api/v1/auth/refresh", authLimiter);
 
 // ─── Parsing ─────────────────────────────────────────────────
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -62,12 +73,8 @@ app.use("/public", (req, res, next) => {
 }, express.static("public"));
 
 // ─── Health check (sin auth) ─────────────────────────────────
-app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV,
-  });
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
 // ─── API v1 ──────────────────────────────────────────────────
