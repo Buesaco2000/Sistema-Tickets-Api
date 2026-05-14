@@ -71,7 +71,7 @@ const findById = async (id, empresaId) => {
   if (!row) throw new AppError('Mantenimiento preventivo no encontrado.', 404);
 
   const [repuestos] = await pool.query(
-    `SELECT rp.id, rp.cantidad, rp.verificacion_estado, cr.nombre AS repuesto
+    `SELECT rp.id, cr.nombre AS repuesto
      FROM repuestos_preventivos rp
      LEFT JOIN catalogo_repuestos cr ON cr.id = rp.repuesto_id
      WHERE rp.preventivo_id = ?`,
@@ -87,7 +87,7 @@ const findById = async (id, empresaId) => {
   );
 
   const [insumos] = await pool.query(
-    `SELECT i.id, i.cantidad, ci.nombre AS insumo
+    `SELECT i.id, ci.nombre AS insumo
      FROM insumos i
      LEFT JOIN catalogo_insumos ci ON ci.id = i.insumo_id
      WHERE i.preventivo_id = ?`,
@@ -163,8 +163,8 @@ const create = async (data, userId, empresaId) => {
     if (Array.isArray(repuestos) && repuestos.length) {
       for (const r of repuestos) {
         await conn.query(
-          'INSERT INTO repuestos_preventivos (preventivo_id, repuesto_id, cantidad, verificacion_estado) VALUES (?,?,?,?)',
-          [prevId, r.repuesto_id || null, r.cantidad || null, r.verificacion_estado || null]
+          'INSERT INTO repuestos_preventivos (preventivo_id, repuesto_id) VALUES (?,?)',
+          [prevId, r.repuesto_id  || null]
         );
       }
     }
@@ -181,8 +181,8 @@ const create = async (data, userId, empresaId) => {
     if (Array.isArray(insumos) && insumos.length) {
       for (const i of insumos) {
         await conn.query(
-          'INSERT INTO insumos (preventivo_id, insumo_id, cantidad) VALUES (?,?,?)',
-          [prevId, i.insumo_id || null, i.cantidad || null]
+          'INSERT INTO insumos (preventivo_id, insumo_id) VALUES (?,?)',
+          [prevId, i.insumo_id || null]
         );
       }
     }

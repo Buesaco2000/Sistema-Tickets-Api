@@ -2,6 +2,15 @@ const pool = require("../../config/database");
 const AppError = require("../../utils/AppError");
 const { getPagination, buildMeta } = require("../../utils/pagination");
 
+const lookupId = async (conn, table, nombre) => {
+  if (!nombre) return null;
+  const [[row]] = await conn.query(
+    `SELECT id FROM ${table} WHERE LOWER(nombre) = LOWER(?) LIMIT 1`,
+    [nombre]
+  );
+  return row?.id ?? null;
+};
+
 const findAll = async (empresaId, filters, pag) => {
   const { page, limit, offset } = pag;
   const conds = ["mc.empresa_id = ?", "mc.deleted_at IS NULL"];
@@ -15,9 +24,9 @@ const findAll = async (empresaId, filters, pag) => {
     conds.push("mc.estado_id = ?");
     params.push(filters.estado_id);
   }
-  if (filters.tipo_servicio) {
-    conds.push("mc.tipo_servicio = ?");
-    params.push(filters.tipo_servicio);
+  if (filters.tipo_servicio_id) {
+    conds.push("mc.tipo_servicio_id = ?");
+    params.push(filters.tipo_servicio_id);
   }
   if (filters.fecha_desde) {
     conds.push("mc.fecha_inicio >= ?");
@@ -36,7 +45,8 @@ const findAll = async (empresaId, filters, pag) => {
   );
 
   const [rows] = await pool.query(
-    `SELECT mc.id, mc.tipo_servicio, mc.fecha_inicio, mc.fecha_entrega,
+    `SELECT mc.id, mc.tipo_servicio_id, ts.nombre AS tipo_servicio,
+            mc.fecha_inicio, mc.fecha_entrega,
             mc.falla_reportada, mc.servicio, mc.se_instalaron_partes, mc.created_at,
             e.nombre  AS estado,
             eb.nombre AS equipo, eb.serie AS equipo_serie,
@@ -45,6 +55,7 @@ const findAll = async (empresaId, filters, pag) => {
      FROM mantenimientos_correctivos mc
      JOIN  estados           e  ON e.id  = mc.estado_id
      JOIN  equipos_biomedicos eb ON eb.id = mc.equipo_id
+     LEFT JOIN tipo_servicios ts ON ts.id = mc.tipo_servicio_id
      LEFT JOIN users ur ON ur.id = mc.realizado_por
      LEFT JOIN users ua ON ua.id = mc.aprobado_por
      WHERE ${where}
@@ -60,6 +71,7 @@ const findById = async (id, empresaId) => {
   const [[row]] = await pool.query(
     `SELECT mc.*,
             e.nombre          AS estado,
+            ts.nombre         AS tipo_servicio,
             eb.nombre         AS equipo,
             eb.serie          AS equipo_serie,
             eb.marca          AS equipo_marca,
@@ -73,6 +85,7 @@ const findById = async (id, empresaId) => {
      FROM mantenimientos_correctivos mc
      JOIN  estados           e  ON e.id  = mc.estado_id
      JOIN  equipos_biomedicos eb ON eb.id = mc.equipo_id
+     LEFT JOIN tipo_servicios ts ON ts.id = mc.tipo_servicio_id
      LEFT JOIN sedes         s  ON s.id  = eb.sede_id
      LEFT JOIN municipios    m  ON m.id  = eb.municipio_id
      LEFT JOIN users ur ON ur.id = mc.realizado_por
@@ -97,7 +110,6 @@ const create = async (data, userId, empresaId) => {
   const {
     equipo_id,
     estado_id,
-    tipo_servicio,
     servicio,
     fecha_inicio,
     falla_reportada,
@@ -105,8 +117,6 @@ const create = async (data, userId, empresaId) => {
     se_instalaron_partes,
     observaciones,
     fecha_entrega,
-    duracion_horas,
-    duracion_minutos,
     realizado_por,
     aprobado_por,
     firma_realizado,
@@ -125,31 +135,34 @@ const create = async (data, userId, empresaId) => {
     );
     if (!eq) throw new AppError("El equipo no pertenece a esta empresa.", 403);
 
+    // Resolver tipo_servicio_id a partir del ID o del nombre
+    const tipo_servicio_id = data.tipo_servicio_id
+      ?? await lookupId(conn, 'tipo_servicios', data.tipo_servicio);
+    if (!tipo_servicio_id) throw new AppError("Tipo de servicio no encontrado.", 400);
+
     const [result] = await conn.query(
       `INSERT INTO mantenimientos_correctivos (
-        empresa_id, equipo_id, estado_id, tipo_servicio, servicio, fecha_inicio, falla_reportada,
-        accion_correctiva, se_instalaron_partes, observaciones, fecha_entrega,
-        duracion_horas, duracion_minutos, realizado_por, aprobado_por,
+        empresa_id, equipo_id, estado_id, tipo_servicio_id, servicio, fecha_inicio, falla_reportada,
+        accion_correctiva, se_instalaron_partes, observaciones,
+        fecha_entrega, realizado_por, aprobado_por,
         firma_realizado, firma_aprobado
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId,
         equipo_id,
         estado_id,
-        tipo_servicio || null,
-        servicio || null,
+        tipo_servicio_id,
+        servicio         || null,
         fecha_inicio,
         falla_reportada,
         accion_correctiva,
         se_instalaron_partes ?? false,
-        observaciones || null,
+        observaciones    || null,
         fecha_entrega,
-        duracion_horas ?? null,
-        duracion_minutos ?? null,
-        realizado_por || null,
-        aprobado_por || null,
-        firma_realizado || null,
-        firma_aprobado || null,
+        realizado_por    || null,
+        aprobado_por     || null,
+        firma_realizado  || null,
+        firma_aprobado   || null,
       ],
     );
     const corrId = result.insertId;
@@ -176,9 +189,18 @@ const create = async (data, userId, empresaId) => {
 const update = async (id, data, userId, empresaId) => {
   await findById(id, empresaId);
 
+  // Resolver tipo_servicio string → tipo_servicio_id si el frontend envía el nombre
+  if (!data.tipo_servicio_id && data.tipo_servicio) {
+    const [[ts]] = await pool.query(
+      'SELECT id FROM tipo_servicios WHERE LOWER(nombre) = LOWER(?) LIMIT 1',
+      [data.tipo_servicio]
+    );
+    if (ts) data.tipo_servicio_id = ts.id;
+  }
+
   const allowed = [
     "estado_id",
-    "tipo_servicio",
+    "tipo_servicio_id",
     "servicio",
     "fecha_inicio",
     "falla_reportada",
@@ -186,12 +208,8 @@ const update = async (id, data, userId, empresaId) => {
     "se_instalaron_partes",
     "observaciones",
     "fecha_entrega",
-    "duracion_horas",
-    "duracion_minutos",
     "realizado_por",
     "aprobado_por",
-    "imagen_antes",
-    "imagen_despues",
     "firma_realizado",
     "firma_aprobado",
   ];

@@ -1,5 +1,5 @@
-const pool     = require('../../Config/database');
-const AppError = require('../../Utils/AppError');
+const pool     = require('../../config/database');
+const AppError = require('../../utils/AppError');
 
 const findByTicket = async (ticketId, empresaId) => {
   const [rows] = await pool.query(
