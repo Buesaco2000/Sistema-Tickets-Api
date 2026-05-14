@@ -7,5 +7,5 @@ node_modules/
 npm-debug.log*
 .DS_Store
 uploads/
-
+/public/
 /src/generated/prisma
