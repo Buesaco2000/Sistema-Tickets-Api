@@ -6,14 +6,14 @@ const AppError = require('../../utils/AppError');
 const COOKIE_OPTS_ACCESS = {
   httpOnly: true,
   secure:   process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
   maxAge:   15 * 60 * 1000,           // 15 min
 };
 
 const COOKIE_OPTS_REFRESH = {
   httpOnly: true,
   secure:   process.env.NODE_ENV === 'production',
-  sameSite: 'strict',
+  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
   maxAge:   7 * 24 * 60 * 60 * 1000, // 7 días
 };
 

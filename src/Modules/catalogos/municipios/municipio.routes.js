@@ -16,9 +16,6 @@ const idParam = z.object({
   params: z.object({ id: z.string().regex(/^\d+$/).transform(Number) }),
 });
 
-router.use(authenticate);
-
-// Lectura disponible para todos los roles autenticados
 router.get("/", async (req, res, next) => {
   try {
     const [rows] = await pool.query(
@@ -43,11 +40,10 @@ router.get("/:id", validate(idParam), async (req, res, next) => {
   }
 });
 
-router.use(authorize(ROLES.ADMIN));
-// Escritura solo ADMIN
-
 router.post(
   "/",
+  authenticate,
+  authorize(ROLES.ADMIN),
   validate(schema),
   async (req, res, next) => {
     try {
@@ -68,6 +64,8 @@ router.post(
 
 router.put(
   "/:id",
+  authenticate,
+  authorize(ROLES.ADMIN),
   validate(idParam),
   validate(schema),
   async (req, res, next) => {
@@ -91,6 +89,8 @@ router.put(
 
 router.delete(
   "/:id",
+  authenticate,
+  authorize(ROLES.ADMIN),
   validate(idParam),
   async (req, res, next) => {
     try {

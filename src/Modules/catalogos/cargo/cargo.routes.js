@@ -16,9 +16,6 @@ const idParam = z.object({
   params: z.object({ id: z.string().regex(/^\d+$/).transform(Number) }),
 });
 
-// Catálogos solo para ADMIN
-router.use(authenticate);
-
 router.get("/", async (req, res, next) => {
   try {
     const [rows] = await pool.query(
@@ -43,9 +40,7 @@ router.get("/:id", validate(idParam), async (req, res, next) => {
   }
 });
 
-router.use(authorize(ROLES.ADMIN));
-
-router.post("/", validate(schema), async (req, res, next) => {
+router.post("/", authenticate, authorize(ROLES.ADMIN), validate(schema), async (req, res, next) => {
   try {
     const [result] = await pool.query(
       "INSERT INTO cargos (nombre) VALUES (?)",
@@ -61,7 +56,7 @@ router.post("/", validate(schema), async (req, res, next) => {
   }
 });
 
-router.put("/:id", validate(idParam), async (req, res, next) => {
+router.put("/:id", authenticate, authorize(ROLES.ADMIN), validate(idParam), async (req, res, next) => {
   try {
     const [result] = await pool.query(
       "UPDATE cargos SET nombre = ? WHERE id = ?",
@@ -79,7 +74,7 @@ router.put("/:id", validate(idParam), async (req, res, next) => {
   }
 });
 
-router.delete("/:id", validate(idParam), async (req, res, next) => {
+router.delete("/:id", authenticate, authorize(ROLES.ADMIN), validate(idParam), async (req, res, next) => {
   try {
     const [result] = await pool.query(
       "DELETE FROM cargos WHERE id = ?",
