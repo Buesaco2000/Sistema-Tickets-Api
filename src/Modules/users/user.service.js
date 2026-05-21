@@ -3,6 +3,17 @@ const pool     = require('../../config/database');
 const AppError = require('../../utils/AppError');
 const { getPagination, buildMeta } = require('../../utils/pagination');
 
+const findDirectorio = async (empresaId) => {
+  const [rows] = await pool.query(
+    `SELECT id, nombres, apellidos
+     FROM users
+     WHERE empresa_id = ? AND deleted_at IS NULL AND activo = 1
+     ORDER BY nombres ASC`,
+    [empresaId]
+  );
+  return rows;
+};
+
 const findAll = async (empresaId, filters, pag) => {
   const { page, limit, offset } = pag;
   const conds  = ['u.empresa_id = ?', 'u.deleted_at IS NULL'];
@@ -119,4 +130,4 @@ const softDelete = async (id, userId, empresaId) => {
   if (!result.affectedRows) throw new AppError('Usuario no encontrado.', 404);
 };
 
-module.exports = { findAll, findById, update, changePassword, setActivo, softDelete };
+module.exports = { findAll, findDirectorio, findById, update, changePassword, setActivo, softDelete };

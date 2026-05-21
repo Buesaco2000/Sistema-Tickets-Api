@@ -14,7 +14,7 @@ const pool = mysql.createPool({
   charset: "utf8mb4",
   ssl:
     process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: true }
+      ? { rejectUnauthorized: false }
       : undefined,
 });
 

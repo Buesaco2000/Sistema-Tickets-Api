@@ -34,6 +34,9 @@ const estadoSchema = z.object({
 
 router.use(authenticate);
 
+// Directorio de nombres — accesible a todos los roles autenticados
+router.get('/directorio', ctrl.getDirectorio);
+
 router.get('/',     authorize(ROLES.ADMIN), ctrl.getAll);
 router.get('/:id',  validate(idParam), ctrl.getOne);
 router.put('/:id',  validate(idParam), validate(updateSchema), ctrl.update);

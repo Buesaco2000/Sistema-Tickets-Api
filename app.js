@@ -8,6 +8,8 @@ const {
   errorHandler,
   notFoundHandler,
 } = require("./src/Middlewares/error.middleware.js");
+const logger       = require("./src/utils/logger");
+const auditLogger  = require("./src/Middlewares/auditLogger.middleware");
 
 const app = express();
 
@@ -63,6 +65,7 @@ app.use(cookieParser());
 if (process.env.NODE_ENV !== "test") {
   app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 }
+app.use(auditLogger);
 
 // ─── Static files ────────────────────────────────────────────
 // Cross-Origin-Resource-Policy debe ser cross-origin para que el frontend
@@ -81,7 +84,10 @@ app.get("/health", (_req, res) => {
 const v1 = express.Router();
 
 // RUTAS DE CARPETA AUTH
-v1.use("/auth", require("./src/Modules/auth/auth.routes.js"));
+v1.use("/auth",     require("./src/Modules/auth/auth.routes.js"));
+
+// EMPRESAS (público — login y registro sin token)
+v1.use("/empresas", require("./src/Modules/empresa/empresa.routes.js"));
 
 // RUTAS DE CARPETA CATALOGOS
 v1.use("/catalogos/cargos",           require("./src/Modules/catalogos/cargo/cargo.routes.js"));
@@ -132,6 +138,12 @@ v1.use("/soportes",                   require("./src/Modules/soportes/soporte.ro
 
 // RUTAS DE CARPETA REPORTES
 v1.use("/reportes",                   require("./src/Modules/reportes/reportes.routes.js"));
+
+// RUTAS DE RECEPCIÓN DE MEDICAMENTOS
+v1.use("/recepciones/medicamentos",   require("./src/Modules/recepcion/recepcion.routes.js"));
+
+// CATÁLOGO DE MEDICAMENTOS
+v1.use("/medicamentos",               require("./src/Modules/catalogoMedicamentos/catalogoMedicamentos.routes.js"));
 
 app.use("/api/v1", v1);
 

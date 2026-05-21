@@ -23,7 +23,7 @@ const findAll = async (empresaId, filters, pag) => {
 
   const [rows] = await pool.query(
     `SELECT
-       t.id, t.estado_id, t.tipo_soporte_id, t.prioridad, t.fecha_cierre, t.created_at, t.updated_at,
+       t.id, t.titulo, t.estado_id, t.tipo_soporte_id, t.prioridad, t.fecha_cierre, t.created_at, t.updated_at,
        e.nombre  AS estado,
        ts.nombre AS tipo_soporte,
        m.nombre  AS municipio,
@@ -68,7 +68,8 @@ const findById = async (id, empresaId) => {
 };
 
 const create = async (data, userId, empresaId) => {
-  const { municipio_incidente_id, tipo_soporte_id, equipo_id, estado_id, prioridad } = data;
+  const { titulo, municipio_incidente_id, tipo_soporte_id, equipo_id, estado_id, prioridad } = data;
+  if (!titulo || !titulo.trim()) throw new AppError('El título del ticket es obligatorio.', 400);
 
   // Verificar que el equipo pertenece a la empresa
   if (equipo_id) {
@@ -84,9 +85,9 @@ const create = async (data, userId, empresaId) => {
     await conn.beginTransaction();
 
     const [result] = await conn.query(
-      `INSERT INTO tickets (empresa_id, municipio_incidente_id, tipo_soporte_id, equipo_id, estado_id, prioridad, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [empresaId, municipio_incidente_id, tipo_soporte_id, equipo_id || null, estado_id, prioridad || 'MEDIA', userId]
+      `INSERT INTO tickets (empresa_id, titulo, municipio_incidente_id, tipo_soporte_id, equipo_id, estado_id, prioridad, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [empresaId, titulo.trim(), municipio_incidente_id, tipo_soporte_id, equipo_id || null, estado_id, prioridad || 'MEDIA', userId]
     );
     const ticketId = result.insertId;
 

@@ -4,6 +4,13 @@ const { getPagination }      = require('../../utils/pagination');
 const AppError               = require('../../utils/AppError');
 const ROLES                  = require('../../utils/roles');
 
+const getDirectorio = async (req, res, next) => {
+  try {
+    const rows = await userService.findDirectorio(req.user.empresa_id);
+    return success(res, rows);
+  } catch (err) { next(err); }
+};
+
 const getAll = async (req, res, next) => {
   try {
     const pag     = getPagination(req.query);
@@ -77,4 +84,4 @@ const remove = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { getAll, getOne, update, changePassword, setActivo, remove };
+module.exports = { getAll, getDirectorio, getOne, update, changePassword, setActivo, remove };

@@ -1,14 +1,16 @@
 const AppError = require('../utils/AppError');
+const logger   = require('../utils/logger');
 
 const errorHandler = (err, req, res, _next) => {
   err.statusCode = err.statusCode || 500;
 
-  // Structured logging (reemplazar con winston en producción)
-  console.error({
+  const level = err.statusCode >= 500 ? 'error' : 'warn';
+  logger[level]({
     method:  req.method,
     path:    req.path,
     status:  err.statusCode,
     message: err.message,
+    code:    err.code || undefined,
     stack:   process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 

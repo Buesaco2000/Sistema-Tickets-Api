@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS tickets (
     tipo_soporte_id INT NOT NULL,
     equipo_id INT,
     estado_id INT NOT NULL,
+    titulo VARCHAR(255) NOT NULL DEFAULT '',
     prioridad ENUM('BAJA','MEDIA','ALTA','CRITICA') DEFAULT 'MEDIA',
     fecha_cierre DATETIME,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -383,6 +384,11 @@ CREATE TABLE IF NOT EXISTS mantenimientos_preventivos (
   bioseguridad_verificada BOOLEAN DEFAULT FALSE,
   equipo_limpio BOOLEAN DEFAULT FALSE,
   observaciones TEXT,
+  servicio VARCHAR(150) NULL,
+  imagen_antes TEXT NULL,
+  imagen_despues TEXT NULL,
+  firma_realizado TEXT NULL,
+  firma_aprobado TEXT NULL,
   realizado_por INT NULL,
   aprobado_por INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -457,6 +463,21 @@ CREATE TABLE IF NOT EXISTS mantenimiento_actividades (
   FOREIGN KEY (preventivo_id) REFERENCES mantenimientos_preventivos(id) ON DELETE CASCADE,
   FOREIGN KEY (actividad_id) REFERENCES catalogo_actividades_mantenimiento(id) ON DELETE RESTRICT,
   INDEX idx_act_prev (preventivo_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS catalogo_verificacion_preventivo (
+  id     INT AUTO_INCREMENT PRIMARY KEY,
+  nombre VARCHAR(150) NOT NULL UNIQUE
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS verificacion_preventivo (
+  id                      INT AUTO_INCREMENT PRIMARY KEY,
+  preventivo_id           INT NOT NULL,
+  catalogo_verificacion_id INT NOT NULL,
+  UNIQUE (preventivo_id, catalogo_verificacion_id),
+  FOREIGN KEY (preventivo_id)            REFERENCES mantenimientos_preventivos(id) ON DELETE CASCADE,
+  FOREIGN KEY (catalogo_verificacion_id) REFERENCES catalogo_verificacion_preventivo(id) ON DELETE RESTRICT,
+  INDEX idx_verif_prev (preventivo_id)
 ) ENGINE=InnoDB;
 
 -- Mantenimientos correctivos
@@ -636,5 +657,90 @@ INSERT IGNORE INTO roles_ticket (nombre) VALUES
 INSERT IGNORE INTO catalogo_actividades_mantenimiento (nombre) VALUES
   ('Limpieza Externa'), ('Limpieza Interna'),
   ('Ajustes'), ('Cambio Partes'), ('Imposicion');
+
+-- ============================================================
+--  Catálogo de medicamentos
+-- ============================================================
+CREATE TABLE IF NOT EXISTS catalogo_medicamentos (
+  id                INT AUTO_INCREMENT PRIMARY KEY,
+  empresa_id        INT NOT NULL,
+  codigo_interno    VARCHAR(50)  NOT NULL,
+  nombre            VARCHAR(255) NOT NULL,
+  presentacion      VARCHAR(150) NULL,
+  concentracion     VARCHAR(100) NULL,
+  precio_2026       DECIMAL(12,2) NULL,
+  precio_regulado   DECIMAL(12,2) NULL,
+  created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  deleted_at        DATETIME  NULL,
+  UNIQUE (codigo_interno, empresa_id),
+  FOREIGN KEY (empresa_id) REFERENCES empresa(id) ON DELETE RESTRICT,
+  INDEX idx_catalogo_med_empresa (empresa_id)
+) ENGINE=InnoDB;
+
+-- ============================================================
+--  Recepción de medicamentos
+-- ============================================================
+CREATE TABLE IF NOT EXISTS recepciones_medicamentos (
+  id                    INT AUTO_INCREMENT PRIMARY KEY,
+  empresa_id            INT NOT NULL,
+  fecha                 DATE         NOT NULL,
+  hora                  TIME         NOT NULL,
+  municipio_id          INT          NULL,
+  sede_id               INT          NULL,
+  uas                   VARCHAR(100) NULL,
+  proveedor             VARCHAR(255) NOT NULL,
+  remision_factura      VARCHAR(100) NOT NULL,
+  reactivos             VARCHAR(255) NULL,
+  responsable_entrega   VARCHAR(150) NOT NULL,
+  responsable_recibe    VARCHAR(150) NOT NULL,
+  created_by            INT          NULL,
+  created_at            TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  deleted_at            DATETIME  NULL,
+  FOREIGN KEY (empresa_id)   REFERENCES empresa(id)    ON DELETE RESTRICT,
+  FOREIGN KEY (municipio_id) REFERENCES municipios(id) ON DELETE SET NULL,
+  FOREIGN KEY (sede_id)      REFERENCES sedes(id)      ON DELETE SET NULL,
+  FOREIGN KEY (created_by)   REFERENCES users(id)      ON DELETE SET NULL,
+  INDEX idx_recep_med_empresa (empresa_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS items_recepcion_medicamentos (
+  id                        INT AUTO_INCREMENT PRIMARY KEY,
+  recepcion_id              INT          NOT NULL,
+  catalogo_id               INT          NULL,
+  codigo_interno            VARCHAR(50)  NULL,
+  nombre                    VARCHAR(255) NOT NULL,
+  presentacion_comercial    VARCHAR(150) NULL,
+  concentracion             VARCHAR(100) NULL,
+  fecha_vencimiento         DATE         NULL,
+  registro_sanitario        VARCHAR(100) NULL,
+  estado_registro           VARCHAR(50)  NULL,
+  cum                       VARCHAR(50)  NULL,
+  atc                       VARCHAR(50)  NULL,
+  laboratorio               VARCHAR(150) NULL,
+  cant_solicitada              INT          NULL,
+  cant_recepcionada            INT          NULL,
+  cant_faltante                INT          NULL,
+  lote                         VARCHAR(50)  NULL,
+  cadena_frio                  BOOLEAN DEFAULT FALSE,
+  temperatura                  VARCHAR(20)  NULL,
+  snna                         VARCHAR(10)  NULL,
+  ta                           VARCHAR(50)  NULL,
+  cod                          VARCHAR(50)  NULL,
+  acr                          VARCHAR(10)  NULL,
+  -- calidad
+  certificado_calidad          BOOLEAN DEFAULT FALSE,
+  tipo_certificado_calidad     VARCHAR(20)  NULL,
+  certificado_esterilizacion   BOOLEAN DEFAULT FALSE,
+  estado_empaque               VARCHAR(20)  NULL,
+  humedo                       BOOLEAN DEFAULT FALSE,
+  colapsado                    BOOLEAN DEFAULT FALSE,
+  manchado                     BOOLEAN DEFAULT FALSE,
+  etiquetas                    BOOLEAN DEFAULT FALSE,
+  tipo_etiquetas               VARCHAR(20)  NULL,
+  FOREIGN KEY (recepcion_id) REFERENCES recepciones_medicamentos(id) ON DELETE CASCADE,
+  FOREIGN KEY (catalogo_id)  REFERENCES catalogo_medicamentos(id)    ON DELETE SET NULL,
+  INDEX idx_items_recep (recepcion_id)
+) ENGINE=InnoDB;
 
 SET FOREIGN_KEY_CHECKS = 1;

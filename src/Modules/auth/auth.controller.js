@@ -3,8 +3,8 @@ const { success }  = require('../../utils/response');
 
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-    const result = await authService.login(email, password);
+    const { email, password, empresa_id } = req.body;
+    const result = await authService.login(email, password, empresa_id);
     res.cookie('accessToken',  result.tokens.accessToken,  result.cookieOpts.access);
     res.cookie('refreshToken', result.tokens.refreshToken, result.cookieOpts.refresh);
     return success(res, { user: result.user }, 'Login exitoso.');

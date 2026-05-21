@@ -15,8 +15,9 @@ const authLimiter = rateLimit({
 
 const loginSchema = z.object({
   body: z.object({
-    email:    z.string().email('Email inválido.'),
-    password: z.string().min(1, 'Password requerido.'),
+    email:      z.string().email('Email inválido.'),
+    password:   z.string().min(1, 'Password requerido.'),
+    empresa_id: z.number().int().positive('ID de empresa requerido.'),
   }),
 });
 

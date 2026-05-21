@@ -1,28 +1,28 @@
 require('dotenv').config();
-const app = require('./app');
-const pool = require('./src/config/database');
+const app    = require('./app');
+const pool   = require('./src/config/database');
+const logger = require('./src/utils/logger');
 
 const PORT = process.env.PORT || 3000;
 
-const server = app.listen(PORT, () => {
-  console.log(`🚀 Server on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+  logger.info(`Server on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 });
 
 const shutdown = async (signal) => {
-  console.log(`\n${signal} received — shutting down gracefully...`);
+  logger.warn(`${signal} received — shutting down gracefully...`);
   server.close(async () => {
-    console.log('HTTP server closed.');
+    logger.info('HTTP server closed.');
     await pool.end();
-    console.log('DB pool closed.');
+    logger.info('DB pool closed.');
     process.exit(0);
   });
-  // Force exit after 10s
   setTimeout(() => { process.exit(1); }, 10_000);
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT',  () => shutdown('SIGINT'));
 process.on('unhandledRejection', (reason) => {
-  console.error('UnhandledRejection:', reason);
+  logger.error({ message: 'UnhandledRejection', reason });
   shutdown('unhandledRejection');
 });

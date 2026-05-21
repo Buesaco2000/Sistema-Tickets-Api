@@ -8,6 +8,7 @@ const ROLES            = require('../../utils/roles');
 
 const createSchema = z.object({
   body: z.object({
+    titulo:                 z.string().min(1, 'El título es obligatorio.').max(255),
     municipio_incidente_id: z.number().int().positive(),
     tipo_soporte_id:        z.number().int().positive(),
     estado_id:              z.number().int().positive(),

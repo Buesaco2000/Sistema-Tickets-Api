@@ -33,7 +33,7 @@ const _generateTokens = (user) => {
   return { accessToken, refreshToken };
 };
 
-const login = async (email, password) => {
+const login = async (email, password, empresaId) => {
   const [rows] = await pool.query(
     `SELECT u.id, u.email, u.password, u.empresa_id, u.rol_id, u.nombres, u.apellidos,
             u.cargo_id, u.municipio_id, u.telefono, u.activo, u.deleted_at,
@@ -44,8 +44,8 @@ const login = async (email, password) => {
      LEFT JOIN roles      r ON r.id = u.rol_id
      LEFT JOIN cargos     c ON c.id = u.cargo_id
      LEFT JOIN municipios m ON m.id = u.municipio_id
-     WHERE u.email = ? LIMIT 1`,
-    [email.toLowerCase().trim()]
+     WHERE u.email = ? AND u.empresa_id = ? LIMIT 1`,
+    [email.toLowerCase().trim(), empresaId]
   );
 
   const user = rows[0];
