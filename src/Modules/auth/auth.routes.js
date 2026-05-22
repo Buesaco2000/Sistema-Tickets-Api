@@ -48,6 +48,19 @@ const registerPublicSchema = z.object({
   }),
 });
 
+const forgotSchema = z.object({
+  body: z.object({ email: z.string().email() }),
+});
+
+const resetSchema = z.object({
+  body: z.object({
+    token:    z.string().min(1),
+    password: z.string().min(8, 'Mínimo 8 caracteres.').max(100),
+  }),
+});
+
+router.post('/forgot-password', authLimiter, validate(forgotSchema), ctrl.forgotPassword);
+router.post('/reset-password',  authLimiter, validate(resetSchema),  ctrl.resetPassword);
 router.post('/login',    authLimiter, validate(loginSchema), ctrl.login);
 router.post('/refresh',  ctrl.refresh);
 router.post('/logout',   authenticate, ctrl.logout);

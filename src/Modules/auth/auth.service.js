@@ -1,8 +1,10 @@
-const bcrypt   = require('bcrypt');
-const jwt      = require('jsonwebtoken');
-const pool     = require('../../config/database');
-const AppError = require('../../utils/AppError');
-const ROLES    = require('../../utils/roles');
+const bcrypt      = require('bcrypt');
+const jwt         = require('jsonwebtoken');
+const crypto      = require('crypto');
+const pool        = require('../../config/database');
+const AppError    = require('../../utils/AppError');
+const ROLES       = require('../../utils/roles');
+const { sendPasswordReset } = require('../../utils/mailer');
 
 // COOKIE_SECURE=true solo cuando haya HTTPS configurado
 const useSecure = process.env.COOKIE_SECURE === 'true';
@@ -181,4 +183,45 @@ const registerPublic = async (data) => {
   return rows[0];
 };
 
-module.exports = { login, refresh, logout, register, registerPublic };
+const forgotPassword = async (email) => {
+  const [rows] = await pool.query(
+    `SELECT u.id, u.email FROM users u WHERE u.email = ? AND u.deleted_at IS NULL AND u.activo = 1 LIMIT 1`,
+    [email.toLowerCase().trim()]
+  );
+
+  // Respuesta genérica aunque no exista el usuario (evita enumeración)
+  if (!rows[0]) return;
+
+  const user  = rows[0];
+  const token = crypto.randomBytes(32).toString('hex');
+
+  await pool.query(
+    `INSERT INTO password_reset_tokens (user_id, token, expires_at)
+     VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))
+     ON DUPLICATE KEY UPDATE token = VALUES(token), expires_at = VALUES(expires_at)`,
+    [user.id, token]
+  );
+
+  const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
+  const resetLink   = `${frontendUrl}/auth/reset-password?token=${token}`;
+
+  await sendPasswordReset(user.email, resetLink);
+};
+
+const resetPassword = async (token, newPassword) => {
+  if (!token) throw new AppError('Token requerido.', 400);
+
+  const [rows] = await pool.query(
+    `SELECT rt.user_id FROM password_reset_tokens rt
+     WHERE rt.token = ? AND rt.expires_at > NOW() LIMIT 1`,
+    [token]
+  );
+
+  if (!rows[0]) throw new AppError('El enlace es inválido o ya expiró.', 400);
+
+  const hashed = await bcrypt.hash(newPassword, 12);
+  await pool.query('UPDATE users SET password = ? WHERE id = ?', [hashed, rows[0].user_id]);
+  await pool.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [rows[0].user_id]);
+};
+
+module.exports = { login, refresh, logout, register, registerPublic, forgotPassword, resetPassword };

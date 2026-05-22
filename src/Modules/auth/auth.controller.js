@@ -62,4 +62,19 @@ const me = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { login, refresh, logout, register, registerPublic, me };
+const forgotPassword = async (req, res, next) => {
+  try {
+    await authService.forgotPassword(req.body.email);
+    // Siempre responde igual para no revelar si el email existe
+    return success(res, null, 'Si el correo está registrado recibirás un enlace en breve.');
+  } catch (err) { next(err); }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    await authService.resetPassword(req.body.token, req.body.password);
+    return success(res, null, 'Contraseña actualizada correctamente.');
+  } catch (err) { next(err); }
+};
+
+module.exports = { login, refresh, logout, register, registerPublic, me, forgotPassword, resetPassword };
