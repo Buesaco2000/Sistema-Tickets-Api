@@ -24,8 +24,6 @@ const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
   .split(",")
   .map((s) => s.trim().replace(/\/$/, "")); // quita trailing slash
 
-logger.info({ allowedOrigins }, "CORS origins configurados");
-
 app.use(
   cors({
     origin: (origin, callback) => {
