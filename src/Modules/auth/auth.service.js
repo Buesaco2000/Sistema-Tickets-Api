@@ -2,6 +2,7 @@ const bcrypt   = require('bcrypt');
 const jwt      = require('jsonwebtoken');
 const pool     = require('../../config/database');
 const AppError = require('../../utils/AppError');
+const ROLES    = require('../../utils/roles');
 
 // COOKIE_SECURE=true solo cuando haya HTTPS configurado
 const useSecure = process.env.COOKIE_SECURE === 'true';
@@ -154,4 +155,30 @@ const register = async (data, createdBy, creatorEmpresaId) => {
   return user[0];
 };
 
-module.exports = { login, refresh, logout, register };
+// Registro público — cualquier persona puede crear su cuenta con rol SALUD
+const registerPublic = async (data) => {
+  const { nombres, apellidos, email, password, empresa_id, cargo_id, municipio_id, telefono } = data;
+
+  const [existing] = await pool.query(
+    'SELECT id FROM users WHERE email = ? AND empresa_id = ?',
+    [email.toLowerCase().trim(), empresa_id]
+  );
+  if (existing.length) throw new AppError('El email ya está registrado en esta empresa.', 409);
+
+  const hashed = await bcrypt.hash(password, 12);
+
+  const [result] = await pool.query(
+    `INSERT INTO users (nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, telefono)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [nombres, apellidos, email.toLowerCase().trim(), hashed, empresa_id, ROLES.SALUD,
+     cargo_id || null, municipio_id || null, telefono || null]
+  );
+
+  const [rows] = await pool.query(
+    'SELECT id, nombres, apellidos, email, empresa_id, rol_id, cargo_id FROM users WHERE id = ?',
+    [result.insertId]
+  );
+  return rows[0];
+};
+
+module.exports = { login, refresh, logout, register, registerPublic };

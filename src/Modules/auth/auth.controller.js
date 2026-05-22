@@ -35,6 +35,13 @@ const register = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const registerPublic = async (req, res, next) => {
+  try {
+    const user = await authService.registerPublic(req.body);
+    return success(res, user, 'Usuario creado.', 201);
+  } catch (err) { next(err); }
+};
+
 const me = async (req, res, next) => {
   try {
     const [rows] = await require('../../config/database').query(
@@ -55,4 +62,4 @@ const me = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { login, refresh, logout, register, me };
+module.exports = { login, refresh, logout, register, registerPublic, me };

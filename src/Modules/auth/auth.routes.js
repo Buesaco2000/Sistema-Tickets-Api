@@ -35,10 +35,26 @@ const registerSchema = z.object({
   }),
 });
 
+const registerPublicSchema = z.object({
+  body: z.object({
+    nombres:      z.string().min(2).max(150),
+    apellidos:    z.string().min(2).max(150),
+    email:        z.string().email(),
+    password:     z.string().min(8, 'Mínimo 8 caracteres.').max(100),
+    empresa_id:   z.number().int().positive(),
+    cargo_id:     z.number().int().positive().optional().nullable(),
+    municipio_id: z.number().int().positive().optional().nullable(),
+    telefono:     z.string().max(15).optional().nullable(),
+  }),
+});
+
 router.post('/login',    authLimiter, validate(loginSchema), ctrl.login);
 router.post('/refresh',  ctrl.refresh);
 router.post('/logout',   authenticate, ctrl.logout);
 router.get('/me',        authenticate, ctrl.me);
+// Registro público — no requiere autenticación, rol forzado = SALUD
+router.post('/registro', authLimiter, validate(registerPublicSchema), ctrl.registerPublic);
+// Registro admin — solo ADMIN puede crear con cualquier rol
 router.post('/register',
   authLimiter,
   authenticate,
