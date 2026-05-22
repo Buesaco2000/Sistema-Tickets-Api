@@ -3,17 +3,20 @@ const jwt      = require('jsonwebtoken');
 const pool     = require('../../config/database');
 const AppError = require('../../utils/AppError');
 
+// COOKIE_SECURE=true solo cuando haya HTTPS configurado
+const useSecure = process.env.COOKIE_SECURE === 'true';
+
 const COOKIE_OPTS_ACCESS = {
   httpOnly: true,
-  secure:   process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  secure:   useSecure,
+  sameSite: 'lax',
   maxAge:   15 * 60 * 1000,           // 15 min
 };
 
 const COOKIE_OPTS_REFRESH = {
   httpOnly: true,
-  secure:   process.env.NODE_ENV === 'production',
-  sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+  secure:   useSecure,
+  sameSite: 'lax',
   maxAge:   7 * 24 * 60 * 60 * 1000, // 7 días
 };
 

@@ -22,12 +22,21 @@ app.use(helmet());
 
 const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
   .split(",")
-  .map((s) => s.trim());
+  .map((s) => s.trim().replace(/\/$/, "")); // quita trailing slash
+
+logger.info({ allowedOrigins }, "CORS origins configurados");
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin))
+      // Sin origin: peticiones server-to-server, curl, Postman — permitir
+      if (!origin) return callback(null, true);
+
+      const normalized = origin.replace(/\/$/, "");
+      if (allowedOrigins.includes(normalized))
         return callback(null, true);
+
+      logger.warn({ origin, allowedOrigins }, "CORS bloqueado");
       callback(new Error("Not allowed by CORS"));
     },
     credentials: true,

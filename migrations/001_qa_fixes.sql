@@ -1,9 +1,3 @@
--- ============================================================
---  Migración 001 — Correcciones QA
---  Aplicar sobre la base de datos ya existente:
---    mysql -u root -p soporte < migrations/001_qa_fixes.sql
--- ============================================================
-
 USE soporte;
 
 -- ── 1. CRÍTICO-06: campo titulo en tickets ────────────────────
