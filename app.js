@@ -148,6 +148,8 @@ v1.use("/reportes",                   require("./src/Modules/reportes/reportes.r
 
 // RUTAS DE RECEPCIÓN DE MEDICAMENTOS
 v1.use("/recepciones/medicamentos",   require("./src/Modules/recepcion/recepcion.routes.js"));
+v1.use("/traslados",                  require("./src/Modules/traslados/traslados.routes.js"));
+v1.use("/dispensaciones",             require("./src/Modules/dispensaciones/dispensaciones.routes.js"));
 
 // CATÁLOGO DE MEDICAMENTOS
 v1.use("/medicamentos",               require("./src/Modules/catalogoMedicamentos/catalogoMedicamentos.routes.js"));

@@ -46,14 +46,16 @@ const me = async (req, res, next) => {
   try {
     const [rows] = await require('../../config/database').query(
       `SELECT u.id, u.nombres, u.apellidos, u.email, u.empresa_id, u.rol_id,
-              u.cargo_id, u.municipio_id, u.telefono, u.activo,
+              u.cargo_id, u.municipio_id, u.sede_id, u.telefono, u.activo,
               r.nombre  AS rol,
               c.nombre  AS cargo,
-              m.nombre  AS municipio
+              m.nombre  AS municipio,
+              s.nombre  AS sede
        FROM users u
        LEFT JOIN roles      r ON r.id = u.rol_id
        LEFT JOIN cargos     c ON c.id = u.cargo_id
        LEFT JOIN municipios m ON m.id = u.municipio_id
+       LEFT JOIN sedes      s ON s.id  = u.sede_id
        WHERE u.id = ? AND u.activo = 1 AND u.deleted_at IS NULL`,
       [req.user.id]
     );
@@ -64,7 +66,7 @@ const me = async (req, res, next) => {
 
 const forgotPassword = async (req, res, next) => {
   try {
-    await authService.forgotPassword(req.body.email);
+    await authService.forgotPassword(req.body.email, req.body.empresa_id ?? null);
     // Siempre responde igual para no revelar si el email existe
     return success(res, null, 'Si el correo está registrado recibirás un enlace en breve.');
   } catch (err) { next(err); }

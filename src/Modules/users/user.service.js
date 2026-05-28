@@ -1,14 +1,18 @@
-const bcrypt   = require('bcrypt');
-const pool     = require('../../config/database');
-const AppError = require('../../utils/AppError');
+const bcrypt      = require('bcrypt');
+const pool        = require('../../config/database');
+const AppError    = require('../../utils/AppError');
 const { getPagination, buildMeta } = require('../../utils/pagination');
+const { logAudit } = require('../../utils/auditLog');
 
 const findDirectorio = async (empresaId) => {
+  // Devolvemos cargo para que el frontend pueda mostrarlo en el Autocomplete
+  // y filtrar quién puede ser destinatario de una dispensación
   const [rows] = await pool.query(
-    `SELECT id, nombres, apellidos
-     FROM users
-     WHERE empresa_id = ? AND deleted_at IS NULL AND activo = 1
-     ORDER BY nombres ASC`,
+    `SELECT u.id, u.nombres, u.apellidos, c.nombre AS cargo
+     FROM users u
+     LEFT JOIN cargos c ON c.id = u.cargo_id
+     WHERE u.empresa_id = ? AND u.deleted_at IS NULL AND u.activo = 1
+     ORDER BY u.nombres ASC`,
     [empresaId]
   );
   return rows;
@@ -52,12 +56,13 @@ const findAll = async (empresaId, filters, pag) => {
 const findById = async (id, empresaId) => {
   const [[row]] = await pool.query(
     `SELECT u.id, u.nombres, u.apellidos, u.email, u.telefono, u.activo,
-            u.rol_id, u.cargo_id, u.municipio_id, u.created_at, u.updated_at,
-            r.nombre AS rol, c.nombre AS cargo, m.nombre AS municipio
+            u.rol_id, u.cargo_id, u.municipio_id, u.sede_id, u.created_at, u.updated_at,
+            r.nombre AS rol, c.nombre AS cargo, m.nombre AS municipio, s.nombre AS sede
      FROM users u
      LEFT JOIN roles      r ON r.id = u.rol_id
      LEFT JOIN cargos     c ON c.id = u.cargo_id
      LEFT JOIN municipios m ON m.id = u.municipio_id
+     LEFT JOIN sedes      s ON s.id  = u.sede_id
      WHERE u.id = ? AND u.empresa_id = ? AND u.deleted_at IS NULL`,
     [id, empresaId]
   );
@@ -68,7 +73,7 @@ const findById = async (id, empresaId) => {
 const update = async (id, data, userId, empresaId) => {
   await findById(id, empresaId);
 
-  const allowed = ['nombres', 'apellidos', 'telefono', 'rol_id', 'cargo_id', 'municipio_id'];
+  const allowed = ['nombres', 'apellidos', 'telefono', 'rol_id', 'cargo_id', 'municipio_id', 'sede_id'];
   const fields  = [];
   const values  = [];
 
@@ -116,10 +121,19 @@ const setActivo = async (id, activo, userId, empresaId) => {
     [activo, userId, id, empresaId]
   );
   if (!result.affectedRows) throw new AppError('Usuario no encontrado.', 404);
+
+  logAudit({
+    empresaId,
+    usuarioId:   userId,
+    tabla:       'users',
+    registroId:  id,
+    accion:      'UPDATE',
+    modulo:      'USUARIOS',
+    descripcion: activo ? `Usuario #${id} activado` : `Usuario #${id} desactivado`,
+  });
 };
 
 const softDelete = async (id, userId, empresaId) => {
-  // Evitar que un admin se elimine a sí mismo
   if (id === userId) throw new AppError('No puedes eliminar tu propia cuenta.', 400);
 
   const [result] = await pool.query(
@@ -128,6 +142,16 @@ const softDelete = async (id, userId, empresaId) => {
     [userId, id, empresaId]
   );
   if (!result.affectedRows) throw new AppError('Usuario no encontrado.', 404);
+
+  logAudit({
+    empresaId,
+    usuarioId:   userId,
+    tabla:       'users',
+    registroId:  id,
+    accion:      'DELETE',
+    modulo:      'USUARIOS',
+    descripcion: `Usuario #${id} eliminado (soft delete)`,
+  });
 };
 
 module.exports = { findAll, findDirectorio, findById, update, changePassword, setActivo, softDelete };

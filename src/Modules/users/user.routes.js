@@ -18,6 +18,7 @@ const updateSchema = z.object({
     rol_id:       z.number().int().positive().optional().nullable(),
     cargo_id:     z.number().int().positive().optional().nullable(),
     municipio_id: z.number().int().positive().optional().nullable(),
+    sede_id:      z.number().int().positive().optional().nullable(),
   }).refine(d => Object.keys(d).length > 0, { message: 'Se requiere al menos un campo.' }),
 });
 

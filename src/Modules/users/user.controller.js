@@ -47,9 +47,9 @@ const update = async (req, res, next) => {
 
     // Solo ADMIN puede cambiar campos de acceso
     if (!isAdmin) {
-      const restricted = ['rol_id', 'cargo_id', 'municipio_id'];
+      const restricted = ['rol_id', 'cargo_id', 'municipio_id', 'sede_id'];
       if (restricted.some(f => req.body[f] !== undefined)) {
-        return next(new AppError('No tienes permisos para modificar rol, cargo o municipio.', 403));
+        return next(new AppError('No tienes permisos para modificar rol, cargo, municipio o sede.', 403));
       }
     }
 

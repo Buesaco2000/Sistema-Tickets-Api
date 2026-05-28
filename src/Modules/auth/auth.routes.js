@@ -49,7 +49,10 @@ const registerPublicSchema = z.object({
 });
 
 const forgotSchema = z.object({
-  body: z.object({ email: z.string().email() }),
+  body: z.object({
+    email:      z.string().email(),
+    empresa_id: z.number().int().positive().optional().nullable(),
+  }),
 });
 
 const resetSchema = z.object({

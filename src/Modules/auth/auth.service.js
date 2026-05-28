@@ -24,11 +24,17 @@ const COOKIE_OPTS_REFRESH = {
 };
 
 const _generateTokens = (user) => {
+  // Incluimos cargo, nombres y apellidos en el token para que las rutas
+  // puedan tomar decisiones de acceso basadas en el cargo (ej: dispensaciones)
+  // sin hacer una consulta extra a la BD en cada request.
   const payload = {
     id:         user.id,
     empresa_id: user.empresa_id,
     rol_id:     user.rol_id,
     email:      user.email,
+    cargo:      user.cargo    || null,
+    nombres:    user.nombres  || null,
+    apellidos:  user.apellidos || null,
   };
   const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
   const refreshToken = jwt.sign(
@@ -42,14 +48,16 @@ const _generateTokens = (user) => {
 const login = async (email, password, empresaId) => {
   const [rows] = await pool.query(
     `SELECT u.id, u.email, u.password, u.empresa_id, u.rol_id, u.nombres, u.apellidos,
-            u.cargo_id, u.municipio_id, u.telefono, u.activo, u.deleted_at,
+            u.cargo_id, u.municipio_id, u.sede_id, u.telefono, u.activo, u.deleted_at,
             r.nombre AS rol,
             c.nombre AS cargo,
-            m.nombre AS municipio
+            m.nombre AS municipio,
+            s.nombre AS sede
      FROM users u
      LEFT JOIN roles      r ON r.id = u.rol_id
      LEFT JOIN cargos     c ON c.id = u.cargo_id
      LEFT JOIN municipios m ON m.id = u.municipio_id
+     LEFT JOIN sedes      s ON s.id  = u.sede_id
      WHERE u.email = ? AND u.empresa_id = ? LIMIT 1`,
     [email.toLowerCase().trim(), empresaId]
   );
@@ -67,7 +75,7 @@ const login = async (email, password, empresaId) => {
   const tokens = _generateTokens(user);
 
   // Guardar hash del refresh token (rotación con un token por usuario)
-  const tokenHash = await bcrypt.hash(tokens.refreshToken, 8);
+  const tokenHash = await bcrypt.hash(tokens.refreshToken, 10);
   await pool.query(
     `INSERT INTO refresh_tokens (user_id, token_hash, expires_at)
      VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))
@@ -90,6 +98,8 @@ const login = async (email, password, empresaId) => {
       cargo:        user.cargo,
       municipio_id: user.municipio_id,
       municipio:    user.municipio,
+      sede_id:      user.sede_id,
+      sede:         user.sede,
       telefono:     user.telefono,
       activo:       user.activo,
     },
@@ -107,9 +117,11 @@ const refresh = async (refreshToken) => {
   }
 
   const [rows] = await pool.query(
-    `SELECT rt.token_hash, u.id, u.empresa_id, u.rol_id, u.email, u.activo, u.deleted_at
+    `SELECT rt.token_hash, u.id, u.empresa_id, u.rol_id, u.email, u.activo, u.deleted_at,
+            c.nombre AS cargo, u.nombres, u.apellidos
      FROM refresh_tokens rt
      JOIN users u ON u.id = rt.user_id
+     LEFT JOIN cargos c ON c.id = u.cargo_id
      WHERE rt.user_id = ? AND rt.expires_at > NOW()`,
     [decoded.id]
   );
@@ -131,10 +143,11 @@ const logout = async (userId) => {
 const register = async (data, createdBy, creatorEmpresaId) => {
   const { nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, telefono } = data;
 
-  // Un admin solo puede crear usuarios en su propia empresa
-  if (empresa_id !== creatorEmpresaId) {
+  if (empresa_id !== creatorEmpresaId)
     throw new AppError('No puedes crear usuarios en otra empresa.', 403);
-  }
+
+  if (rol_id && !Object.values(ROLES).includes(rol_id))
+    throw new AppError('Rol no válido.', 400);
 
   const [existing] = await pool.query(
     'SELECT id FROM users WHERE email = ? AND empresa_id = ?',
@@ -159,7 +172,7 @@ const register = async (data, createdBy, creatorEmpresaId) => {
 
 // Registro público — cualquier persona puede crear su cuenta con rol SALUD
 const registerPublic = async (data) => {
-  const { nombres, apellidos, email, password, empresa_id, cargo_id, municipio_id, telefono } = data;
+  const { nombres, apellidos, email, password, empresa_id, cargo_id, municipio_id, sede_id, telefono } = data;
 
   const [existing] = await pool.query(
     'SELECT id FROM users WHERE email = ? AND empresa_id = ?',
@@ -170,10 +183,10 @@ const registerPublic = async (data) => {
   const hashed = await bcrypt.hash(password, 12);
 
   const [result] = await pool.query(
-    `INSERT INTO users (nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, telefono)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO users (nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, sede_id, telefono)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [nombres, apellidos, email.toLowerCase().trim(), hashed, empresa_id, ROLES.SALUD,
-     cargo_id || null, municipio_id || null, telefono || null]
+     cargo_id || null, municipio_id || null, sede_id || null, telefono || null]
   );
 
   const [rows] = await pool.query(
@@ -183,27 +196,38 @@ const registerPublic = async (data) => {
   return rows[0];
 };
 
-const forgotPassword = async (email) => {
+// SEC-03: acepta empresa_id opcional para aislar la búsqueda por tenant
+const forgotPassword = async (email, empresaId = null) => {
+  const conds  = ['u.email = ?', 'u.deleted_at IS NULL', 'u.activo = 1'];
+  const params = [email.toLowerCase().trim()];
+
+  if (empresaId) {
+    conds.push('u.empresa_id = ?');
+    params.push(empresaId);
+  }
+
   const [rows] = await pool.query(
-    `SELECT u.id, u.email FROM users u WHERE u.email = ? AND u.deleted_at IS NULL AND u.activo = 1 LIMIT 1`,
-    [email.toLowerCase().trim()]
+    `SELECT u.id, u.email FROM users u WHERE ${conds.join(' AND ')} LIMIT 1`,
+    params
   );
 
   // Respuesta genérica aunque no exista el usuario (evita enumeración)
   if (!rows[0]) return;
 
-  const user  = rows[0];
-  const token = crypto.randomBytes(32).toString('hex');
+  const user      = rows[0];
+  const rawToken  = crypto.randomBytes(32).toString('hex');
+  // SEC-01: almacenar solo el hash SHA-256 del token (el token real viaja en el email)
+  const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
   await pool.query(
     `INSERT INTO password_reset_tokens (user_id, token, expires_at)
      VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))
      ON DUPLICATE KEY UPDATE token = VALUES(token), expires_at = VALUES(expires_at)`,
-    [user.id, token]
+    [user.id, tokenHash]
   );
 
   const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim();
-  const resetLink   = `${frontendUrl}/auth/reset-password?token=${token}`;
+  const resetLink   = `${frontendUrl}/auth/reset-password?token=${rawToken}`;
 
   await sendPasswordReset(user.email, resetLink);
 };
@@ -211,10 +235,13 @@ const forgotPassword = async (email) => {
 const resetPassword = async (token, newPassword) => {
   if (!token) throw new AppError('Token requerido.', 400);
 
+  // SEC-01: comparar contra el hash almacenado
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
   const [rows] = await pool.query(
     `SELECT rt.user_id FROM password_reset_tokens rt
      WHERE rt.token = ? AND rt.expires_at > NOW() LIMIT 1`,
-    [token]
+    [tokenHash]
   );
 
   if (!rows[0]) throw new AppError('El enlace es inválido o ya expiró.', 400);

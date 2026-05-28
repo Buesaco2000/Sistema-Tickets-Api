@@ -17,7 +17,7 @@ router.get('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
 
 router.get('/items', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
-    const data = await svc.findAllItems(req.user.empresa_id);
+    const data = await svc.findAllItems(req.user.empresa_id, req.user.id, req.user.rol_id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
@@ -40,6 +40,20 @@ router.delete('/:id', authorize(ROLES.ADMIN), async (req, res, next) => {
   try {
     await svc.softDelete(Number(req.params.id), req.user.empresa_id);
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+router.post('/salidas', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const id = await svc.createSalida(req.body, req.user.id, req.user.empresa_id);
+    res.status(201).json({ success: true, data: { id } });
+  } catch (err) { next(err); }
+});
+
+router.get('/salidas/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.getSalidasByItem(Number(req.params.item_id), req.user.empresa_id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

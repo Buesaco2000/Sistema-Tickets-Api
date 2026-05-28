@@ -6,7 +6,65 @@ const { success }      = require('../../Utils/response');
 const ROLES            = require('../../Utils/roles');
 
 router.use(authenticate);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /reportes/log-export
+// Cualquier usuario autenticado puede registrar una exportación.
+// El frontend lo llama silenciosamente después de cada CSV/PDF descargado.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/log-export', async (req, res, next) => {
+  try {
+    const { logAudit } = require('../../Utils/auditLog');
+    const { modulo = null, descripcion = null, tabla = 'reportes', registroId = 0, datosNuevos = null } = req.body;
+
+    logAudit({
+      empresaId:   req.user.empresa_id,
+      usuarioId:   req.user.id,
+      tabla,
+      registroId,
+      accion:      'EXPORT',
+      modulo:      modulo ? String(modulo).toUpperCase() : null,
+      descripcion,
+      datosNuevos,
+      ip:          req.ip || req.headers['x-forwarded-for'] || null,
+      userAgent:   req.headers['user-agent'] || null,
+    });
+
+    return success(res, null, 'Export registrado.');
+  } catch (err) { next(err); }
+});
+
+// Las siguientes rutas solo para ADMIN e INGENIERO
 router.use(authorize(ROLES.ADMIN, ROLES.INGENIERO));
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /reportes/historial-exports
+// Devuelve el historial de exportaciones de la empresa (últimas 300)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/historial-exports', async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT
+         al.id,
+         al.created_at,
+         al.modulo,
+         al.descripcion,
+         al.datos_nuevos,
+         al.ip,
+         CONCAT(u.nombres, ' ', u.apellidos) AS usuario,
+         u.cargo_id,
+         c.nombre AS cargo
+       FROM audit_log al
+       LEFT JOIN users  u ON u.id = al.usuario_id
+       LEFT JOIN cargos c ON c.id = u.cargo_id
+       WHERE al.empresa_id = ? AND al.accion = 'EXPORT'
+       ORDER BY al.created_at DESC
+       LIMIT 300`,
+      [req.user.empresa_id]
+    );
+    return success(res, rows);
+  } catch (err) { next(err); }
+});
 
 // GET /reportes/historico  — totales por mes/año
 router.get('/historico', async (req, res, next) => {

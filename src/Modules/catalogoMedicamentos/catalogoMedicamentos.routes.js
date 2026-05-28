@@ -5,7 +5,7 @@ const { authorize } = require('../../Middlewares/rbac.middleware');
 
 router.use(authenticate);
 
-// Búsqueda abierta a todos los roles (regentes usan esto en la recepción)
+// Búsqueda abierta a todos los roles (Directores Técnicos usan esto en la recepción)
 router.get('/buscar', async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim();
