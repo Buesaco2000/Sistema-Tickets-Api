@@ -12,16 +12,22 @@ const pool = mysql.createPool({
   queueLimit: 0,
   timezone: "+00:00",
   charset: "utf8mb4",
-  // SEC-05: en producción rechazar certificados no verificados por defecto.
-  // Si tu proveedor de BD requiere rejectUnauthorized:false (ej. PlanetScale trial),
-  // establece DB_SSL_REJECT_UNAUTHORIZED=false en las variables de entorno.
   ssl:
-    process.env.NODE_ENV === "production"
+    process.env.DB_SSL === "true"
       ? {
           rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
           ...(process.env.DB_SSL_CA ? { ca: require("fs").readFileSync(process.env.DB_SSL_CA) } : {}),
         }
       : undefined,
+
+      //LA USAMOS EN PRODUCCION SI TENEMOS LA BASE DE DATOS Y EL BACKEND SEPARADOS NO LOCAL 
+  // ssl:
+  //   process.env.NODE_ENV === "production"
+  //     ? {
+  //         rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
+  //         ...(process.env.DB_SSL_CA ? { ca: require("fs").readFileSync(process.env.DB_SSL_CA) } : {}),
+  //       }
+  //     : undefined,
 });
 
 // Verificar conexión a la base de datos
