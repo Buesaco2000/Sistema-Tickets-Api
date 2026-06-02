@@ -27,7 +27,7 @@ const findById = async (id, empresaId) => {
 const findAll = async (empresaId) => {
   const [rows] = await pool.query(
     `SELECT r.id, r.fecha, r.hora, r.proveedor, r.remision_factura,
-            r.responsable_recibe, r.created_at,
+            r.responsable_recibe, r.tipo_recepcion, r.created_at,
             mu.nombre AS municipio, s.nombre AS sede
      FROM recepciones_medicamentos r
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
@@ -70,26 +70,35 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
   for (const m of medicamentos) {
     await conn.query(
       `INSERT INTO items_recepcion_medicamentos
-         (recepcion_id, catalogo_id, codigo_interno, nombre, presentacion_comercial,
-          concentracion, fecha_vencimiento, registro_sanitario, estado_registro,
-          cum, atc, laboratorio, cant_solicitada, cant_recepcionada, cant_faltante, lote,
+         (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
+          concentracion, ium, unidad_medida,
+          fecha_vencimiento, registro_sanitario, estado_registro,
+          cum, atc, laboratorio,
+          clasificacion_riesgo, vida_util, serie,
+          cant_solicitada, cant_recepcionada, cant_faltante, lote,
           cadena_frio, temperatura, snna, ta, cod, acr,
           estado_empaque,
           humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         recepcionId,
         m.catalogo_id                  || null,
+        m.tipo_recepcion               || 'MEDICAMENTOS',
         m.codigo_interno               || null,
         m.nombre,
         m.presentacion_comercial       || null,
         m.concentracion                || null,
+        m.ium                          || null,
+        m.unidad_medida                || null,
         m.fecha_vencimiento            || null,
         m.registro_sanitario           || null,
         m.estado_registro              || null,
         m.cum                          || null,
         m.atc                          || null,
         m.laboratorio                  || null,
+        m.clasificacion_riesgo         || null,
+        m.vida_util                    || null,
+        m.serie                        || null,
         m.cant_solicitada              || null,
         m.cant_recepcionada            || null,
         m.cant_faltante                || null,
@@ -115,7 +124,7 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
 // Si el usuario ya tiene un borrador, lo reemplaza. Si no, crea uno nuevo.
 const saveBorrador = async (data, userId, empresaId) => {
   const {
-    fecha, hora, municipio_id, sede_id, uas, proveedor,
+    tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
     remision_factura, reactivos, responsable_recibe,
     medicamentos, borradorId,
   } = data;
@@ -140,10 +149,11 @@ const saveBorrador = async (data, userId, empresaId) => {
       // Actualizar cabecera del borrador existente
       await conn.query(
         `UPDATE recepciones_medicamentos SET
-           fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
+           tipo_recepcion = ?, fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
            proveedor = ?, remision_factura = ?, reactivos = ?, responsable_recibe = ?
          WHERE id = ?`,
         [
+          tipo_recepcion || 'MEDICAMENTOS',
           fecha, hora,
           municipio_id || null, sede_id || null, uas || null,
           proveedor, remision_factura, reactivos || null, responsable_recibe,
@@ -156,11 +166,11 @@ const saveBorrador = async (data, userId, empresaId) => {
       // Crear borrador nuevo
       const [result] = await conn.query(
         `INSERT INTO recepciones_medicamentos
-           (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
+           (empresa_id, tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
             remision_factura, reactivos, responsable_recibe, estado, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
-          empresaId, fecha, hora,
+          empresaId, tipo_recepcion || 'MEDICAMENTOS', fecha, hora,
           municipio_id || null, sede_id || null, uas || null,
           proveedor, remision_factura, reactivos || null, responsable_recibe,
           'BORRADOR', userId,
@@ -193,7 +203,7 @@ const deleteBorrador = async (id, userId, empresaId) => {
 // ── Crear recepción COMPLETADA ────────────────────────────────────────────────
 const create = async (data, userId, empresaId) => {
   const {
-    fecha, hora, municipio_id, sede_id, uas, proveedor,
+    tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
     remision_factura, reactivos, responsable_recibe,
     medicamentos, borradorId,
   } = data;
@@ -204,11 +214,13 @@ const create = async (data, userId, empresaId) => {
 
     const [result] = await conn.query(
       `INSERT INTO recepciones_medicamentos
-         (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
+         (empresa_id, tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
           remision_factura, reactivos, responsable_recibe, estado, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
-        empresaId, fecha, hora,
+        empresaId,
+        tipo_recepcion || 'MEDICAMENTOS',
+        fecha, hora,
         municipio_id   || null,
         sede_id        || null,
         uas            || null,
