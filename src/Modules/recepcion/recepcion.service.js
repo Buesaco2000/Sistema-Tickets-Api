@@ -23,6 +23,7 @@ const findById = async (id, empresaId) => {
   return { ...row, medicamentos };
 };
 
+// Solo retorna recepciones COMPLETADAS (borradores no aparecen en el listado)
 const findAll = async (empresaId) => {
   const [rows] = await pool.query(
     `SELECT r.id, r.fecha, r.hora, r.proveedor, r.remision_factura,
@@ -31,18 +32,174 @@ const findAll = async (empresaId) => {
      FROM recepciones_medicamentos r
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes      s  ON s.id  = r.sede_id
-     WHERE r.empresa_id = ? AND r.deleted_at IS NULL
+     WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
      ORDER BY r.fecha DESC, r.hora DESC`,
     [empresaId]
   );
   return rows;
 };
 
+// ── BORRADOR: buscar el borrador activo del usuario ───────────────────────────
+const findBorradorByUser = async (userId, empresaId) => {
+  const [[row]] = await pool.query(
+    `SELECT r.*,
+            mu.nombre AS municipio,
+            s.nombre  AS sede
+     FROM recepciones_medicamentos r
+     LEFT JOIN municipios mu ON mu.id = r.municipio_id
+     LEFT JOIN sedes      s  ON s.id  = r.sede_id
+     WHERE r.created_by = ? AND r.empresa_id = ?
+       AND r.estado = 'BORRADOR' AND r.deleted_at IS NULL
+     ORDER BY r.created_at DESC
+     LIMIT 1`,
+    [userId, empresaId]
+  );
+  if (!row) return null;
+
+  const [medicamentos] = await pool.query(
+    'SELECT * FROM items_recepcion_medicamentos WHERE recepcion_id = ? ORDER BY id',
+    [row.id]
+  );
+
+  return { ...row, medicamentos };
+};
+
+// ── Función interna: inserta los ítems de un borrador/recepción ───────────────
+const _insertarItems = async (conn, recepcionId, medicamentos) => {
+  if (!Array.isArray(medicamentos) || !medicamentos.length) return;
+  for (const m of medicamentos) {
+    await conn.query(
+      `INSERT INTO items_recepcion_medicamentos
+         (recepcion_id, catalogo_id, codigo_interno, nombre, presentacion_comercial,
+          concentracion, fecha_vencimiento, registro_sanitario, estado_registro,
+          cum, atc, laboratorio, cant_solicitada, cant_recepcionada, cant_faltante, lote,
+          cadena_frio, temperatura, snna, ta, cod, acr,
+          certificado_calidad, tipo_certificado_calidad,
+          certificado_esterilizacion, estado_empaque,
+          humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        recepcionId,
+        m.catalogo_id                  || null,
+        m.codigo_interno               || null,
+        m.nombre,
+        m.presentacion_comercial       || null,
+        m.concentracion                || null,
+        m.fecha_vencimiento            || null,
+        m.registro_sanitario           || null,
+        m.estado_registro              || null,
+        m.cum                          || null,
+        m.atc                          || null,
+        m.laboratorio                  || null,
+        m.cant_solicitada              || null,
+        m.cant_recepcionada            || null,
+        m.cant_faltante                || null,
+        m.lote                         || null,
+        m.cadena_frio                  ?? false,
+        m.temperatura                  || null,
+        m.snna                         || null,
+        m.ta                           || null,
+        m.cod                          || null,
+        m.acr                          || null,
+        m.certificado_calidad          ?? false,
+        m.tipo_certificado_calidad     || null,
+        m.certificado_esterilizacion   ?? false,
+        m.estado_empaque               || null,
+        m.humedo                       ?? false,
+        m.colapsado                    ?? false,
+        m.manchado                     ?? false,
+        m.etiquetas                    ?? false,
+        m.tipo_etiquetas               || null,
+      ]
+    );
+  }
+};
+
+// ── BORRADOR: guardar o actualizar ────────────────────────────────────────────
+// Si el usuario ya tiene un borrador, lo reemplaza. Si no, crea uno nuevo.
+const saveBorrador = async (data, userId, empresaId) => {
+  const {
+    fecha, hora, municipio_id, sede_id, uas, proveedor,
+    remision_factura, reactivos, responsable_recibe,
+    medicamentos, borradorId,
+  } = data;
+
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    let recepcionId = borradorId || null;
+
+    if (recepcionId) {
+      // Verificar que el borrador pertenece a este usuario y empresa
+      const [[existente]] = await conn.query(
+        `SELECT id FROM recepciones_medicamentos
+         WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR' AND deleted_at IS NULL`,
+        [recepcionId, userId, empresaId]
+      );
+      if (!existente) recepcionId = null;
+    }
+
+    if (recepcionId) {
+      // Actualizar cabecera del borrador existente
+      await conn.query(
+        `UPDATE recepciones_medicamentos SET
+           fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
+           proveedor = ?, remision_factura = ?, reactivos = ?, responsable_recibe = ?
+         WHERE id = ?`,
+        [
+          fecha, hora,
+          municipio_id || null, sede_id || null, uas || null,
+          proveedor, remision_factura, reactivos || null, responsable_recibe,
+          recepcionId,
+        ]
+      );
+      // Reemplazar todos los ítems
+      await conn.query('DELETE FROM items_recepcion_medicamentos WHERE recepcion_id = ?', [recepcionId]);
+    } else {
+      // Crear borrador nuevo
+      const [result] = await conn.query(
+        `INSERT INTO recepciones_medicamentos
+           (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
+            remision_factura, reactivos, responsable_recibe, estado, created_by)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [
+          empresaId, fecha, hora,
+          municipio_id || null, sede_id || null, uas || null,
+          proveedor, remision_factura, reactivos || null, responsable_recibe,
+          'BORRADOR', userId,
+        ]
+      );
+      recepcionId = result.insertId;
+    }
+
+    await _insertarItems(conn, recepcionId, medicamentos);
+    await conn.commit();
+    return findById(recepcionId, empresaId);
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+};
+
+// ── BORRADOR: eliminar ────────────────────────────────────────────────────────
+const deleteBorrador = async (id, userId, empresaId) => {
+  const [result] = await pool.query(
+    `UPDATE recepciones_medicamentos SET deleted_at = NOW()
+     WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR' AND deleted_at IS NULL`,
+    [id, userId, empresaId]
+  );
+  if (!result.affectedRows) throw new AppError('Borrador no encontrado.', 404);
+};
+
+// ── Crear recepción COMPLETADA ────────────────────────────────────────────────
 const create = async (data, userId, empresaId) => {
   const {
     fecha, hora, municipio_id, sede_id, uas, proveedor,
     remision_factura, reactivos, responsable_recibe,
-    medicamentos,
+    medicamentos, borradorId,
   } = data;
 
   const conn = await pool.getConnection();
@@ -52,8 +209,8 @@ const create = async (data, userId, empresaId) => {
     const [result] = await conn.query(
       `INSERT INTO recepciones_medicamentos
          (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
-          remision_factura, reactivos, responsable_recibe, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          remision_factura, reactivos, responsable_recibe, estado, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId, fecha, hora,
         municipio_id   || null,
@@ -63,58 +220,21 @@ const create = async (data, userId, empresaId) => {
         remision_factura,
         reactivos      || null,
         responsable_recibe,
+        'COMPLETADA',
         userId,
       ]
     );
     const recepcionId = result.insertId;
 
-    if (Array.isArray(medicamentos) && medicamentos.length) {
-      for (const m of medicamentos) {
-        await conn.query(
-          `INSERT INTO items_recepcion_medicamentos
-             (recepcion_id, catalogo_id, codigo_interno, nombre, presentacion_comercial,
-              concentracion, fecha_vencimiento, registro_sanitario, estado_registro,
-              cum, atc, laboratorio, cant_solicitada, cant_recepcionada, cant_faltante, lote,
-              cadena_frio, temperatura, snna, ta, cod, acr,
-              certificado_calidad, tipo_certificado_calidad,
-              certificado_esterilizacion, estado_empaque,
-              humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          [
-            recepcionId,
-            m.catalogo_id                  || null,
-            m.codigo_interno               || null,
-            m.nombre,
-            m.presentacion_comercial       || null,
-            m.concentracion                || null,
-            m.fecha_vencimiento            || null,
-            m.registro_sanitario           || null,
-            m.estado_registro              || null,
-            m.cum                          || null,
-            m.atc                          || null,
-            m.laboratorio                  || null,
-            m.cant_solicitada              || null,
-            m.cant_recepcionada            || null,
-            m.cant_faltante                || null,
-            m.lote                         || null,
-            m.cadena_frio                  ?? false,
-            m.temperatura                  || null,
-            m.snna                         || null,
-            m.ta                           || null,
-            m.cod                          || null,
-            m.acr                          || null,
-            m.certificado_calidad          ?? false,
-            m.tipo_certificado_calidad     || null,
-            m.certificado_esterilizacion   ?? false,
-            m.estado_empaque               || null,
-            m.humedo                       ?? false,
-            m.colapsado                    ?? false,
-            m.manchado                     ?? false,
-            m.etiquetas                    ?? false,
-            m.tipo_etiquetas               || null,
-          ]
-        );
-      }
+    await _insertarItems(conn, recepcionId, medicamentos);
+
+    // Si venía de un borrador, eliminarlo
+    if (borradorId) {
+      await conn.query(
+        `UPDATE recepciones_medicamentos SET deleted_at = NOW()
+         WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR'`,
+        [borradorId, userId, empresaId]
+      );
     }
 
     await conn.commit();
@@ -136,8 +256,8 @@ const softDelete = async (id, empresaId) => {
   if (!result.affectedRows) throw new AppError('Recepción no encontrada.', 404);
 };
 
+// Solo ítems de recepciones COMPLETADAS (borradores no tienen stock)
 const findAllItems = async (empresaId, userId, rolId) => {
-  // Si no es ADMIN, filtrar solo por municipio del usuario
   let municipioId = null;
 
   if (rolId !== ROLES.ADMIN) {
@@ -148,7 +268,7 @@ const findAllItems = async (empresaId, userId, rolId) => {
     if (profile) municipioId = profile.municipio_id;
   }
 
-  const conds  = ['r.empresa_id = ?', 'r.deleted_at IS NULL'];
+  const conds  = ['r.empresa_id = ?', 'r.deleted_at IS NULL', "r.estado = 'COMPLETADA'"];
   const params = [empresaId];
 
   if (municipioId) {
@@ -167,9 +287,6 @@ const findAllItems = async (empresaId, userId, rolId) => {
             GREATEST(0, COALESCE(i.cant_recepcionada, 0)
                       - COALESCE(SUM(CASE WHEN s.estado != 'RECHAZADO' THEN s.cantidad ELSE 0 END), 0)) AS stock,
             r.fecha AS fecha_recepcion, r.proveedor,
-            -- Subquery: trae la dispensación activa más reciente para este ítem.
-            -- Formato "TIPO|Nombre Destinatario" para parsear en el frontend.
-            -- Solo muestra PENDIENTE o ACEPTADO; RECHAZADO se ignora.
             (SELECT CONCAT(d.tipo, '|', CONCAT(u.nombres, ' ', u.apellidos))
              FROM dispensacion_items di2
              JOIN dispensaciones d ON d.id = di2.dispensacion_id
@@ -229,7 +346,6 @@ const createSalida = async (data, userId, empresaId) => {
     );
     const salidaId = result.insertId;
 
-    // Si es traslado, crear registro pendiente
     if (esTraslado) {
       await conn.query(
         `INSERT INTO traslados_pendientes
@@ -270,4 +386,8 @@ const getSalidasByItem = async (itemId, empresaId) => {
   return rows;
 };
 
-module.exports = { findAll, findAllItems, findById, create, softDelete, createSalida, getSalidasByItem };
+module.exports = {
+  findAll, findAllItems, findById, create, softDelete,
+  createSalida, getSalidasByItem,
+  findBorradorByUser, saveBorrador, deleteBorrador,
+};

@@ -22,6 +22,30 @@ router.get('/items', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── BORRADOR: obtener el borrador activo del usuario autenticado ──────────────
+router.get('/borrador/mio', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.findBorradorByUser(req.user.id, req.user.empresa_id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// ── BORRADOR: guardar o actualizar borrador ───────────────────────────────────
+router.post('/borrador', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.saveBorrador(req.body, req.user.id, req.user.empresa_id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// ── BORRADOR: eliminar borrador ───────────────────────────────────────────────
+router.delete('/borrador/:id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    await svc.deleteBorrador(Number(req.params.id), req.user.id, req.user.empresa_id);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 router.post('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.create(req.body, req.user.id, req.user.empresa_id);
