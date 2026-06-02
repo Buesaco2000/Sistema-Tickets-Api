@@ -48,8 +48,7 @@ const confirmar = async (trasladoId, empresaId, userId, responsableDestino) => {
     `SELECT t.*, i.codigo_interno, i.presentacion_comercial, i.concentracion,
             i.fecha_vencimiento, i.lote, i.registro_sanitario, i.estado_registro,
             i.cum, i.atc, i.laboratorio, i.cadena_frio, i.temperatura,
-            i.snna, i.cod, i.acr, i.certificado_calidad, i.tipo_certificado_calidad,
-            i.certificado_esterilizacion, i.estado_empaque
+            i.snna, i.cod, i.acr, i.estado_empaque
      FROM traslados_pendientes t
      JOIN items_recepcion_medicamentos i ON i.id = t.item_id
      WHERE t.id = ? AND t.empresa_id = ? AND t.estado = 'PENDIENTE'`,
@@ -88,9 +87,8 @@ const confirmar = async (trasladoId, empresaId, userId, responsableDestino) => {
           fecha_vencimiento, lote, registro_sanitario, estado_registro,
           cum, atc, laboratorio, cant_recepcionada, cant_solicitada,
           cadena_frio, temperatura, snna, cod, acr,
-          certificado_calidad, tipo_certificado_calidad,
-          certificado_esterilizacion, estado_empaque)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          estado_empaque)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         recepcionId,
         traslado.medicamento_nombre,
@@ -111,9 +109,6 @@ const confirmar = async (trasladoId, empresaId, userId, responsableDestino) => {
         traslado.snna                || null,
         traslado.cod                 || null,
         traslado.acr                 || null,
-        traslado.certificado_calidad ?? false,
-        traslado.tipo_certificado_calidad || null,
-        traslado.certificado_esterilizacion ?? false,
         traslado.estado_empaque      || null,
       ]
     );

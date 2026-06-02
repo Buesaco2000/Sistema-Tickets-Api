@@ -74,10 +74,9 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
           concentracion, fecha_vencimiento, registro_sanitario, estado_registro,
           cum, atc, laboratorio, cant_solicitada, cant_recepcionada, cant_faltante, lote,
           cadena_frio, temperatura, snna, ta, cod, acr,
-          certificado_calidad, tipo_certificado_calidad,
-          certificado_esterilizacion, estado_empaque,
+          estado_empaque,
           humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         recepcionId,
         m.catalogo_id                  || null,
@@ -101,9 +100,6 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
         m.ta                           || null,
         m.cod                          || null,
         m.acr                          || null,
-        m.certificado_calidad          ?? false,
-        m.tipo_certificado_calidad     || null,
-        m.certificado_esterilizacion   ?? false,
         m.estado_empaque               || null,
         m.humedo                       ?? false,
         m.colapsado                    ?? false,
