@@ -288,6 +288,7 @@ const findAllItems = async (empresaId, userId, rolId) => {
 
   const [rows] = await pool.query(
     `SELECT i.id, i.recepcion_id,
+            i.tipo_recepcion,
             i.codigo_interno, i.nombre, i.presentacion_comercial,
             i.concentracion, i.fecha_vencimiento, i.lote,
             i.cant_solicitada, i.cant_recepcionada,
