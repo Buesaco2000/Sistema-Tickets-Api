@@ -1,6 +1,6 @@
-const pool = require('../../config/database');
-const AppError = require('../../utils/AppError');
-const ROLES = require('../../utils/roles');
+const pool = require("../../config/database");
+const AppError = require("../../utils/AppError");
+const ROLES = require("../../utils/roles");
 
 const findById = async (id, empresaId) => {
   const [[row]] = await pool.query(
@@ -11,13 +11,13 @@ const findById = async (id, empresaId) => {
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes      s  ON s.id  = r.sede_id
      WHERE r.id = ? AND r.empresa_id = ? AND r.deleted_at IS NULL`,
-    [id, empresaId]
+    [id, empresaId],
   );
-  if (!row) throw new AppError('Recepción no encontrada.', 404);
+  if (!row) throw new AppError("Recepción no encontrada.", 404);
 
   const [medicamentos] = await pool.query(
-    'SELECT * FROM items_recepcion_medicamentos WHERE recepcion_id = ? ORDER BY id',
-    [id]
+    "SELECT * FROM items_recepcion_medicamentos WHERE recepcion_id = ? ORDER BY id",
+    [id],
   );
 
   return { ...row, medicamentos };
@@ -34,7 +34,7 @@ const findAll = async (empresaId) => {
      LEFT JOIN sedes      s  ON s.id  = r.sede_id
      WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
      ORDER BY r.fecha DESC, r.hora DESC`,
-    [empresaId]
+    [empresaId],
   );
   return rows;
 };
@@ -52,13 +52,13 @@ const findBorradorByUser = async (userId, empresaId) => {
        AND r.estado = 'BORRADOR' AND r.deleted_at IS NULL
      ORDER BY r.created_at DESC
      LIMIT 1`,
-    [userId, empresaId]
+    [userId, empresaId],
   );
   if (!row) return null;
 
   const [medicamentos] = await pool.query(
-    'SELECT * FROM items_recepcion_medicamentos WHERE recepcion_id = ? ORDER BY id',
-    [row.id]
+    "SELECT * FROM items_recepcion_medicamentos WHERE recepcion_id = ? ORDER BY id",
+    [row.id],
   );
 
   return { ...row, medicamentos };
@@ -69,7 +69,7 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
   if (!Array.isArray(medicamentos) || !medicamentos.length) return;
   for (const m of medicamentos) {
     const fechaVencimiento = m.fecha_vencimiento
-      ? new Date(m.fecha_vencimiento).toISOString().split('T')[0]
+      ? new Date(m.fecha_vencimiento).toISOString().split("T")[0]
       : null;
 
     await conn.query(
@@ -86,40 +86,40 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         recepcionId,
-        m.catalogo_id                  || null,
-        m.tipo_recepcion               || 'MEDICAMENTOS',
-        m.codigo_interno               || null,
+        m.catalogo_id || null,
+        m.tipo_recepcion || "MEDICAMENTOS",
+        m.codigo_interno || null,
         m.nombre,
-        m.presentacion_comercial       || null,
-        m.concentracion                || null,
-        m.ium                          || null,
-        m.unidad_medida                || null,
+        m.presentacion_comercial || null,
+        m.concentracion || null,
+        m.ium || null,
+        m.unidad_medida || null,
         m.fecha_vencimiento,
-        m.registro_sanitario           || null,
-        m.estado_registro              || null,
-        m.cum                          || null,
-        m.atc                          || null,
-        m.laboratorio                  || null,
-        m.clasificacion_riesgo         || null,
-        m.vida_util                    || null,
-        m.serie                        || null,
-        m.cant_solicitada              || null,
-        m.cant_recepcionada            || null,
-        m.cant_faltante                || null,
-        m.lote                         || null,
-        m.cadena_frio                  ?? false,
-        m.temperatura                  || null,
-        m.snna                         || null,
-        m.ta                           || null,
-        m.cod                          || null,
-        m.acr                          || null,
-        m.estado_empaque               || null,
-        m.humedo                       ?? false,
-        m.colapsado                    ?? false,
-        m.manchado                     ?? false,
-        m.etiquetas                    ?? false,
-        m.tipo_etiquetas               || null,
-      ]
+        m.registro_sanitario || null,
+        m.estado_registro || null,
+        m.cum || null,
+        m.atc || null,
+        m.laboratorio || null,
+        m.clasificacion_riesgo || null,
+        m.vida_util || null,
+        m.serie || null,
+        m.cant_solicitada || null,
+        m.cant_recepcionada || null,
+        m.cant_faltante || null,
+        m.lote || null,
+        m.cadena_frio ?? false,
+        m.temperatura || null,
+        m.snna || null,
+        m.ta || null,
+        m.cod || null,
+        m.acr || null,
+        m.estado_empaque || null,
+        m.humedo ?? false,
+        m.colapsado ?? false,
+        m.manchado ?? false,
+        m.etiquetas ?? false,
+        m.tipo_etiquetas || null,
+      ],
     );
   }
 };
@@ -128,12 +128,26 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
 // Si el usuario ya tiene un borrador, lo reemplaza. Si no, crea uno nuevo.
 const saveBorrador = async (data, userId, empresaId) => {
   const {
-    tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
-    remision_factura, reactivos, responsable_recibe,
-    medicamentos, borradorId,
+    tipo_recepcion,
+    fecha,
+    hora,
+    municipio_id,
+    sede_id,
+    uas,
+    proveedor,
+    remision_factura,
+    reactivos,
+    responsable_recibe,
+    medicamentos,
+    borradorId,
   } = data;
 
+  const fechaRecepcion = fecha
+    ? new Date(fecha).toISOString().split("T")[0]
+    : null;
+
   const conn = await pool.getConnection();
+
   try {
     await conn.beginTransaction();
 
@@ -144,7 +158,7 @@ const saveBorrador = async (data, userId, empresaId) => {
       const [[existente]] = await conn.query(
         `SELECT id FROM recepciones_medicamentos
          WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR' AND deleted_at IS NULL`,
-        [recepcionId, userId, empresaId]
+        [recepcionId, userId, empresaId],
       );
       if (!existente) recepcionId = null;
     }
@@ -157,14 +171,23 @@ const saveBorrador = async (data, userId, empresaId) => {
            proveedor = ?, remision_factura = ?, reactivos = ?, responsable_recibe = ?
          WHERE id = ?`,
         [
-          fecha, hora,
-          municipio_id || null, sede_id || null, uas || null,
-          proveedor, remision_factura, reactivos || null, responsable_recibe,
+          fechaRecepcion,
+          hora,
+          municipio_id || null,
+          sede_id || null,
+          uas || null,
+          proveedor,
+          remision_factura,
+          reactivos || null,
+          responsable_recibe,
           recepcionId,
-        ]
+        ],
       );
       // Reemplazar todos los ítems
-      await conn.query('DELETE FROM items_recepcion_medicamentos WHERE recepcion_id = ?', [recepcionId]);
+      await conn.query(
+        "DELETE FROM items_recepcion_medicamentos WHERE recepcion_id = ?",
+        [recepcionId],
+      );
     } else {
       // Crear borrador nuevo
       const [result] = await conn.query(
@@ -173,11 +196,19 @@ const saveBorrador = async (data, userId, empresaId) => {
             remision_factura, reactivos, responsable_recibe, estado, created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
-          empresaId, fecha, hora,
-          municipio_id || null, sede_id || null, uas || null,
-          proveedor, remision_factura, reactivos || null, responsable_recibe,
-          'BORRADOR', userId,
-        ]
+          empresaId,
+          fechaRecepcion,
+          hora,
+          municipio_id || null,
+          sede_id || null,
+          uas || null,
+          proveedor,
+          remision_factura,
+          reactivos || null,
+          responsable_recibe,
+          "BORRADOR",
+          userId,
+        ],
       );
       recepcionId = result.insertId;
     }
@@ -198,17 +229,26 @@ const deleteBorrador = async (id, userId, empresaId) => {
   const [result] = await pool.query(
     `UPDATE recepciones_medicamentos SET deleted_at = NOW()
      WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR' AND deleted_at IS NULL`,
-    [id, userId, empresaId]
+    [id, userId, empresaId],
   );
-  if (!result.affectedRows) throw new AppError('Borrador no encontrado.', 404);
+  if (!result.affectedRows) throw new AppError("Borrador no encontrado.", 404);
 };
 
 // ── Crear recepción COMPLETADA ────────────────────────────────────────────────
 const create = async (data, userId, empresaId) => {
   const {
-    tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
-    remision_factura, reactivos, responsable_recibe,
-    medicamentos, borradorId,
+    tipo_recepcion,
+    fecha,
+    hora,
+    municipio_id,
+    sede_id,
+    uas,
+    proveedor,
+    remision_factura,
+    reactivos,
+    responsable_recibe,
+    medicamentos,
+    borradorId,
   } = data;
 
   const conn = await pool.getConnection();
@@ -222,17 +262,18 @@ const create = async (data, userId, empresaId) => {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId,
-        fecha, hora,
-        municipio_id   || null,
-        sede_id        || null,
-        uas            || null,
+        fecha,
+        hora,
+        municipio_id || null,
+        sede_id || null,
+        uas || null,
         proveedor,
         remision_factura,
-        reactivos      || null,
+        reactivos || null,
         responsable_recibe,
-        'COMPLETADA',
+        "COMPLETADA",
         userId,
-      ]
+      ],
     );
     const recepcionId = result.insertId;
 
@@ -243,7 +284,7 @@ const create = async (data, userId, empresaId) => {
       await conn.query(
         `UPDATE recepciones_medicamentos SET deleted_at = NOW()
          WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR'`,
-        [borradorId, userId, empresaId]
+        [borradorId, userId, empresaId],
       );
     }
 
@@ -261,9 +302,9 @@ const softDelete = async (id, empresaId) => {
   const [result] = await pool.query(
     `UPDATE recepciones_medicamentos SET deleted_at = NOW()
      WHERE id = ? AND empresa_id = ? AND deleted_at IS NULL`,
-    [id, empresaId]
+    [id, empresaId],
   );
-  if (!result.affectedRows) throw new AppError('Recepción no encontrada.', 404);
+  if (!result.affectedRows) throw new AppError("Recepción no encontrada.", 404);
 };
 
 // Solo ítems de recepciones COMPLETADAS (borradores no tienen stock)
@@ -272,21 +313,25 @@ const findAllItems = async (empresaId, userId, rolId) => {
 
   if (rolId !== ROLES.ADMIN) {
     const [[profile]] = await pool.query(
-      'SELECT municipio_id FROM users WHERE id = ? LIMIT 1',
-      [userId]
+      "SELECT municipio_id FROM users WHERE id = ? LIMIT 1",
+      [userId],
     );
     if (profile) municipioId = profile.municipio_id;
   }
 
-  const conds  = ['r.empresa_id = ?', 'r.deleted_at IS NULL', "r.estado = 'COMPLETADA'"];
+  const conds = [
+    "r.empresa_id = ?",
+    "r.deleted_at IS NULL",
+    "r.estado = 'COMPLETADA'",
+  ];
   const params = [empresaId];
 
   if (municipioId) {
-    conds.push('r.municipio_id = ?');
+    conds.push("r.municipio_id = ?");
     params.push(municipioId);
   }
 
-  const where = conds.join(' AND ');
+  const where = conds.join(" AND ");
 
   const [rows] = await pool.query(
     `SELECT i.id, i.recepcion_id,
@@ -311,14 +356,21 @@ const findAllItems = async (empresaId, userId, rolId) => {
      WHERE ${where}
      GROUP BY i.id
      ORDER BY i.nombre ASC`,
-    params
+    params,
   );
   return rows;
 };
 
 const createSalida = async (data, userId, empresaId) => {
-  const { item_id, cantidad, fecha, motivo, responsable,
-          municipio_destino_id, sede_destino_id } = data;
+  const {
+    item_id,
+    cantidad,
+    fecha,
+    motivo,
+    responsable,
+    municipio_destino_id,
+    sede_destino_id,
+  } = data;
 
   const [[item]] = await pool.query(
     `SELECT i.id, i.nombre,
@@ -331,17 +383,17 @@ const createSalida = async (data, userId, empresaId) => {
      LEFT JOIN salidas_medicamentos s ON s.item_id = i.id
      WHERE i.id = ? AND r.empresa_id = ?
      GROUP BY i.id`,
-    [item_id, empresaId]
+    [item_id, empresaId],
   );
-  if (!item) throw new AppError('Ítem no encontrado.', 404);
+  if (!item) throw new AppError("Ítem no encontrado.", 404);
 
   const stock = Math.max(0, item.cant_recepcionada - item.total_salidas);
   if (cantidad > stock) {
     throw new AppError(`Stock insuficiente. Disponible: ${stock}`, 400);
   }
 
-  const esTraslado = motivo === 'Traslado';
-  const estadoSalida = esTraslado ? 'PENDIENTE' : 'ACTIVO';
+  const esTraslado = motivo === "Traslado";
+  const estadoSalida = esTraslado ? "PENDIENTE" : "ACTIVO";
 
   const conn = await pool.getConnection();
   try {
@@ -352,8 +404,18 @@ const createSalida = async (data, userId, empresaId) => {
          (empresa_id, item_id, cantidad, fecha, motivo, responsable, estado,
           municipio_destino_id, sede_destino_id, created_by)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [empresaId, item_id, cantidad, fecha, motivo, responsable, estadoSalida,
-       municipio_destino_id || null, sede_destino_id || null, userId]
+      [
+        empresaId,
+        item_id,
+        cantidad,
+        fecha,
+        motivo,
+        responsable,
+        estadoSalida,
+        municipio_destino_id || null,
+        sede_destino_id || null,
+        userId,
+      ],
     );
     const salidaId = result.insertId;
 
@@ -364,9 +426,18 @@ const createSalida = async (data, userId, empresaId) => {
             responsable_origen, municipio_origen_id, sede_origen_id,
             municipio_destino_id, sede_destino_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [empresaId, salidaId, item_id, cantidad, item.nombre,
-         responsable, item.municipio_origen_id || null, item.sede_origen_id || null,
-         municipio_destino_id || null, sede_destino_id || null]
+        [
+          empresaId,
+          salidaId,
+          item_id,
+          cantidad,
+          item.nombre,
+          responsable,
+          item.municipio_origen_id || null,
+          item.sede_origen_id || null,
+          municipio_destino_id || null,
+          sede_destino_id || null,
+        ],
       );
     }
 
@@ -392,13 +463,20 @@ const getSalidasByItem = async (itemId, empresaId) => {
      LEFT JOIN sedes      se ON se.id = s.sede_destino_id
      WHERE s.item_id = ? AND r.empresa_id = ?
      ORDER BY s.fecha DESC, s.created_at DESC`,
-    [itemId, empresaId]
+    [itemId, empresaId],
   );
   return rows;
 };
 
 module.exports = {
-  findAll, findAllItems, findById, create, softDelete,
-  createSalida, getSalidasByItem,
-  findBorradorByUser, saveBorrador, deleteBorrador,
+  findAll,
+  findAllItems,
+  findById,
+  create,
+  softDelete,
+  createSalida,
+  getSalidasByItem,
+  findBorradorByUser,
+  saveBorrador,
+  deleteBorrador,
 };
