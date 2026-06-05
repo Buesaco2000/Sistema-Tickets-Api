@@ -68,6 +68,10 @@ const findBorradorByUser = async (userId, empresaId) => {
 const _insertarItems = async (conn, recepcionId, medicamentos) => {
   if (!Array.isArray(medicamentos) || !medicamentos.length) return;
   for (const m of medicamentos) {
+    const fechaVencimiento = m.fecha_vencimiento
+      ? new Date(m.fecha_vencimiento).toISOString().split('T')[0]
+      : null;
+
     await conn.query(
       `INSERT INTO items_recepcion_medicamentos
          (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
@@ -90,7 +94,7 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
         m.concentracion                || null,
         m.ium                          || null,
         m.unidad_medida                || null,
-        m.fecha_vencimiento            || null,
+        m.fecha_vencimiento,
         m.registro_sanitario           || null,
         m.estado_registro              || null,
         m.cum                          || null,
