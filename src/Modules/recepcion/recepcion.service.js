@@ -94,7 +94,7 @@ const _insertarItems = async (conn, recepcionId, medicamentos) => {
         m.concentracion || null,
         m.ium || null,
         m.unidad_medida || null,
-        fecha_vencimiento,
+        fechaVencimiento,
         m.registro_sanitario || null,
         m.estado_registro || null,
         m.cum || null,
