@@ -27,7 +27,7 @@ const findById = async (id, empresaId) => {
 const findAll = async (empresaId) => {
   const [rows] = await pool.query(
     `SELECT r.id, r.fecha, r.hora, r.proveedor, r.remision_factura,
-            r.responsable_recibe, r.tipo_recepcion, r.created_at,
+            r.responsable_recibe, r.created_at,
             mu.nombre AS municipio, s.nombre AS sede
      FROM recepciones_medicamentos r
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
@@ -149,11 +149,10 @@ const saveBorrador = async (data, userId, empresaId) => {
       // Actualizar cabecera del borrador existente
       await conn.query(
         `UPDATE recepciones_medicamentos SET
-           tipo_recepcion = ?, fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
+           fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
            proveedor = ?, remision_factura = ?, reactivos = ?, responsable_recibe = ?
          WHERE id = ?`,
         [
-          tipo_recepcion || 'MEDICAMENTOS',
           fecha, hora,
           municipio_id || null, sede_id || null, uas || null,
           proveedor, remision_factura, reactivos || null, responsable_recibe,
@@ -166,11 +165,11 @@ const saveBorrador = async (data, userId, empresaId) => {
       // Crear borrador nuevo
       const [result] = await conn.query(
         `INSERT INTO recepciones_medicamentos
-           (empresa_id, tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
+           (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
             remision_factura, reactivos, responsable_recibe, estado, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
-          empresaId, tipo_recepcion || 'MEDICAMENTOS', fecha, hora,
+          empresaId, fecha, hora,
           municipio_id || null, sede_id || null, uas || null,
           proveedor, remision_factura, reactivos || null, responsable_recibe,
           'BORRADOR', userId,
@@ -214,12 +213,11 @@ const create = async (data, userId, empresaId) => {
 
     const [result] = await conn.query(
       `INSERT INTO recepciones_medicamentos
-         (empresa_id, tipo_recepcion, fecha, hora, municipio_id, sede_id, uas, proveedor,
+         (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
           remision_factura, reactivos, responsable_recibe, estado, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId,
-        tipo_recepcion || 'MEDICAMENTOS',
         fecha, hora,
         municipio_id   || null,
         sede_id        || null,
