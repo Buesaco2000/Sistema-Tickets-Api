@@ -659,11 +659,12 @@ INSERT IGNORE INTO catalogo_actividades_mantenimiento (nombre) VALUES
   ('Ajustes'), ('Cambio Partes'), ('Imposicion');
 
 -- ============================================================
---  Catálogo de medicamentos
+--  Catálogo de items (medicamentos, laboratorio, médico-quirúrgico, aseo y papelería)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS catalogo_medicamentos (
+CREATE TABLE IF NOT EXISTS catalogo_items (
   id                INT AUTO_INCREMENT PRIMARY KEY,
   empresa_id        INT NOT NULL,
+  categoria         ENUM('MEDICAMENTOS','LABORATORIO','MEDICO_QUIRURGICO','ASEO_PAPELERIA') NOT NULL,
   codigo_interno    VARCHAR(50)  NOT NULL,
   nombre            VARCHAR(255) NOT NULL,
   presentacion      VARCHAR(150) NULL,
@@ -673,9 +674,9 @@ CREATE TABLE IF NOT EXISTS catalogo_medicamentos (
   created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   deleted_at        DATETIME  NULL,
-  UNIQUE (codigo_interno, empresa_id),
+  UNIQUE (codigo_interno, empresa_id, categoria),
   FOREIGN KEY (empresa_id) REFERENCES empresa(id) ON DELETE RESTRICT,
-  INDEX idx_catalogo_med_empresa (empresa_id)
+  INDEX idx_catalogo_items_empresa (empresa_id, categoria)
 ) ENGINE=InnoDB;
 
 -- ============================================================
@@ -739,7 +740,7 @@ CREATE TABLE IF NOT EXISTS items_recepcion_medicamentos (
   etiquetas                    BOOLEAN DEFAULT FALSE,
   tipo_etiquetas               VARCHAR(20)  NULL,
   FOREIGN KEY (recepcion_id) REFERENCES recepciones_medicamentos(id) ON DELETE CASCADE,
-  FOREIGN KEY (catalogo_id)  REFERENCES catalogo_medicamentos(id)    ON DELETE SET NULL,
+  FOREIGN KEY (catalogo_id)  REFERENCES catalogo_items(id)           ON DELETE SET NULL,
   INDEX idx_items_recep (recepcion_id)
 ) ENGINE=InnoDB;
 

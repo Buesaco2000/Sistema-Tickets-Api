@@ -151,8 +151,12 @@ v1.use("/recepciones/medicamentos",   require("./src/Modules/recepcion/recepcion
 v1.use("/traslados",                  require("./src/Modules/traslados/traslados.routes.js"));
 v1.use("/dispensaciones",             require("./src/Modules/dispensaciones/dispensaciones.routes.js"));
 
-// CATÁLOGO DE MEDICAMENTOS
-v1.use("/medicamentos",               require("./src/Modules/catalogoMedicamentos/catalogoMedicamentos.routes.js"));
+// CATÁLOGOS DE ITEMS (medicamentos, laboratorio, médico-quirúrgico, aseo y papelería)
+const crearCatalogoItemsRouter = require("./src/Modules/catalogoItems/catalogoItems.routes.js");
+v1.use("/medicamentos",               crearCatalogoItemsRouter('MEDICAMENTOS'));
+v1.use("/laboratorio",                crearCatalogoItemsRouter('LABORATORIO'));
+v1.use("/medico-quirurgico",          crearCatalogoItemsRouter('MEDICO_QUIRURGICO'));
+v1.use("/aseo-papeleria",             crearCatalogoItemsRouter('ASEO_PAPELERIA'));
 
 app.use("/api/v1", v1);
 

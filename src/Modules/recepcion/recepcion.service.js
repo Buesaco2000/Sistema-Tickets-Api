@@ -64,63 +64,98 @@ const findBorradorByUser = async (userId, empresaId) => {
   return { ...row, medicamentos };
 };
 
-// ── Función interna: inserta los ítems de un borrador/recepción ───────────────
-const _insertarItems = async (conn, recepcionId, medicamentos) => {
-  if (!Array.isArray(medicamentos) || !medicamentos.length) return;
-  for (const m of medicamentos) {
+// ── Función interna: sincroniza los ítems de un borrador/recepción ────────────
+// Actualiza los que ya existen (traen `id`), inserta los nuevos (sin `id`)
+// y elimina los que estaban en BD pero ya no vienen en el payload.
+const _syncItems = async (conn, recepcionId, medicamentos) => {
+  const items = Array.isArray(medicamentos) ? medicamentos : [];
+
+  const [existentes] = await conn.query(
+    "SELECT id FROM items_recepcion_medicamentos WHERE recepcion_id = ?",
+    [recepcionId],
+  );
+  const idsExistentes = new Set(existentes.map((r) => r.id));
+  const idsEnviados = new Set(
+    items.filter((m) => m.id).map((m) => Number(m.id)),
+  );
+
+  const idsAEliminar = [...idsExistentes].filter((id) => !idsEnviados.has(id));
+  if (idsAEliminar.length) {
+    await conn.query(
+      "DELETE FROM items_recepcion_medicamentos WHERE id IN (?)",
+      [idsAEliminar],
+    );
+  }
+
+  for (const m of items) {
     const fechaVencimiento = m.fecha_vencimiento
       ? new Date(m.fecha_vencimiento).toISOString().split("T")[0]
       : null;
 
-    await conn.query(
-      `INSERT INTO items_recepcion_medicamentos
-         (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
-          concentracion, ium, unidad_medida,
-          fecha_vencimiento, registro_sanitario, estado_registro,
-          cum, atc, laboratorio,
-          clasificacion_riesgo, vida_util, serie,
-          cant_solicitada, cant_recepcionada, cant_faltante, lote,
-          cadena_frio, temperatura, snna, ta, cod, acr,
-          estado_empaque,
-          humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        recepcionId,
-        m.catalogo_id || null,
-        m.tipo_recepcion || "MEDICAMENTOS",
-        m.codigo_interno || null,
-        m.nombre,
-        m.presentacion_comercial || null,
-        m.concentracion || null,
-        m.ium || null,
-        m.unidad_medida || null,
-        fechaVencimiento,
-        m.registro_sanitario || null,
-        m.estado_registro || null,
-        m.cum || null,
-        m.atc || null,
-        m.laboratorio || null,
-        m.clasificacion_riesgo || null,
-        m.vida_util || null,
-        m.serie || null,
-        m.cant_solicitada || null,
-        m.cant_recepcionada || null,
-        m.cant_faltante || null,
-        m.lote || null,
-        m.cadena_frio ?? false,
-        m.temperatura || null,
-        m.snna || null,
-        m.ta || null,
-        m.cod || null,
-        m.acr || null,
-        m.estado_empaque || null,
-        m.humedo ?? false,
-        m.colapsado ?? false,
-        m.manchado ?? false,
-        m.etiquetas ?? false,
-        m.tipo_etiquetas || null,
-      ],
-    );
+    const valores = [
+      m.catalogo_id || null,
+      m.tipo_recepcion || "MEDICAMENTOS",
+      m.codigo_interno || null,
+      m.nombre,
+      m.presentacion_comercial || null,
+      m.concentracion || null,
+      m.ium || null,
+      m.unidad_medida || null,
+      fechaVencimiento,
+      m.registro_sanitario || null,
+      m.estado_registro || null,
+      m.cum || null,
+      m.atc || null,
+      m.laboratorio || null,
+      m.clasificacion_riesgo || null,
+      m.vida_util || null,
+      m.serie || null,
+      m.cant_solicitada || null,
+      m.cant_recepcionada || null,
+      m.cant_faltante || null,
+      m.lote || null,
+      m.cadena_frio ?? false,
+      m.temperatura || null,
+      m.snna || null,
+      m.ta || null,
+      m.cod || null,
+      m.acr || null,
+      m.estado_empaque || null,
+      m.humedo ?? false,
+      m.colapsado ?? false,
+      m.manchado ?? false,
+      m.etiquetas ?? false,
+      m.tipo_etiquetas || null,
+    ];
+
+    if (m.id && idsExistentes.has(Number(m.id))) {
+      await conn.query(
+        `UPDATE items_recepcion_medicamentos SET
+           catalogo_id=?, tipo_recepcion=?, codigo_interno=?, nombre=?, presentacion_comercial=?,
+           concentracion=?, ium=?, unidad_medida=?, fecha_vencimiento=?, registro_sanitario=?,
+           estado_registro=?, cum=?, atc=?, laboratorio=?, clasificacion_riesgo=?, vida_util=?,
+           serie=?, cant_solicitada=?, cant_recepcionada=?, cant_faltante=?, lote=?, cadena_frio=?,
+           temperatura=?, snna=?, ta=?, cod=?, acr=?, estado_empaque=?, humedo=?, colapsado=?,
+           manchado=?, etiquetas=?, tipo_etiquetas=?
+         WHERE id = ? AND recepcion_id = ?`,
+        [...valores, Number(m.id), recepcionId],
+      );
+    } else {
+      await conn.query(
+        `INSERT INTO items_recepcion_medicamentos
+           (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
+            concentracion, ium, unidad_medida,
+            fecha_vencimiento, registro_sanitario, estado_registro,
+            cum, atc, laboratorio,
+            clasificacion_riesgo, vida_util, serie,
+            cant_solicitada, cant_recepcionada, cant_faltante, lote,
+            cadena_frio, temperatura, snna, ta, cod, acr,
+            estado_empaque,
+            humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [recepcionId, ...valores],
+      );
+    }
   }
 };
 
@@ -183,11 +218,6 @@ const saveBorrador = async (data, userId, empresaId) => {
           recepcionId,
         ],
       );
-      // Reemplazar todos los ítems
-      await conn.query(
-        "DELETE FROM items_recepcion_medicamentos WHERE recepcion_id = ?",
-        [recepcionId],
-      );
     } else {
       // Crear borrador nuevo
       const [result] = await conn.query(
@@ -213,7 +243,7 @@ const saveBorrador = async (data, userId, empresaId) => {
       recepcionId = result.insertId;
     }
 
-    await _insertarItems(conn, recepcionId, medicamentos);
+    await _syncItems(conn, recepcionId, medicamentos);
     await conn.commit();
     return findById(recepcionId, empresaId);
   } catch (err) {
@@ -277,7 +307,7 @@ const create = async (data, userId, empresaId) => {
     );
     const recepcionId = result.insertId;
 
-    await _insertarItems(conn, recepcionId, medicamentos);
+    await _syncItems(conn, recepcionId, medicamentos);
 
     // Si venía de un borrador, eliminarlo
     if (borradorId) {
