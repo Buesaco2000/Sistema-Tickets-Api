@@ -682,7 +682,7 @@ CREATE TABLE IF NOT EXISTS catalogo_items (
 -- ============================================================
 --  Recepción de medicamentos
 -- ============================================================
-CREATE TABLE IF NOT EXISTS recepciones_medicamentos (
+CREATE TABLE IF NOT EXISTS recepciones_inventario (
   id                    INT AUTO_INCREMENT PRIMARY KEY,
   empresa_id            INT NOT NULL,
   fecha                 DATE         NOT NULL,
@@ -705,7 +705,7 @@ CREATE TABLE IF NOT EXISTS recepciones_medicamentos (
   INDEX idx_recep_med_empresa (empresa_id)
 ) ENGINE=InnoDB;
 
-CREATE TABLE IF NOT EXISTS items_recepcion_medicamentos (
+CREATE TABLE IF NOT EXISTS items_recepcion_inventario (
   id                        INT AUTO_INCREMENT PRIMARY KEY,
   recepcion_id              INT          NOT NULL,
   catalogo_id               INT          NULL,
@@ -739,7 +739,7 @@ CREATE TABLE IF NOT EXISTS items_recepcion_medicamentos (
   manchado                     BOOLEAN DEFAULT FALSE,
   etiquetas                    BOOLEAN DEFAULT FALSE,
   tipo_etiquetas               VARCHAR(20)  NULL,
-  FOREIGN KEY (recepcion_id) REFERENCES recepciones_medicamentos(id) ON DELETE CASCADE,
+  FOREIGN KEY (recepcion_id) REFERENCES recepciones_inventario(id) ON DELETE CASCADE,
   FOREIGN KEY (catalogo_id)  REFERENCES catalogo_items(id)           ON DELETE SET NULL,
   INDEX idx_items_recep (recepcion_id)
 ) ENGINE=InnoDB;

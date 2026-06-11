@@ -7,7 +7,7 @@ const findById = async (id, empresaId) => {
     `SELECT r.*,
             mu.nombre AS municipio,
             s.nombre  AS sede
-     FROM recepciones_medicamentos r
+     FROM recepciones_inventario r
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes      s  ON s.id  = r.sede_id
      WHERE r.id = ? AND r.empresa_id = ? AND r.deleted_at IS NULL`,
@@ -16,7 +16,7 @@ const findById = async (id, empresaId) => {
   if (!row) throw new AppError("Recepción no encontrada.", 404);
 
   const [medicamentos] = await pool.query(
-    "SELECT * FROM items_recepcion_medicamentos WHERE recepcion_id = ? ORDER BY id",
+    "SELECT * FROM items_recepcion_inventario WHERE recepcion_id = ? ORDER BY id",
     [id],
   );
 
@@ -29,7 +29,7 @@ const findAll = async (empresaId) => {
     `SELECT r.id, r.fecha, r.hora, r.proveedor, r.remision_factura,
             r.responsable_recibe, r.created_at,
             mu.nombre AS municipio, s.nombre AS sede
-     FROM recepciones_medicamentos r
+     FROM recepciones_inventario r
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes      s  ON s.id  = r.sede_id
      WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
@@ -45,7 +45,7 @@ const findBorradorByUser = async (userId, empresaId) => {
     `SELECT r.*,
             mu.nombre AS municipio,
             s.nombre  AS sede
-     FROM recepciones_medicamentos r
+     FROM recepciones_inventario r
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes      s  ON s.id  = r.sede_id
      WHERE r.created_by = ? AND r.empresa_id = ?
@@ -57,7 +57,7 @@ const findBorradorByUser = async (userId, empresaId) => {
   if (!row) return null;
 
   const [medicamentos] = await pool.query(
-    "SELECT * FROM items_recepcion_medicamentos WHERE recepcion_id = ? ORDER BY id",
+    "SELECT * FROM items_recepcion_inventario WHERE recepcion_id = ? ORDER BY id",
     [row.id],
   );
 
@@ -71,7 +71,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
   const items = Array.isArray(medicamentos) ? medicamentos : [];
 
   const [existentes] = await conn.query(
-    "SELECT id FROM items_recepcion_medicamentos WHERE recepcion_id = ?",
+    "SELECT id FROM items_recepcion_inventario WHERE recepcion_id = ?",
     [recepcionId],
   );
   const idsExistentes = new Set(existentes.map((r) => r.id));
@@ -82,7 +82,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
   const idsAEliminar = [...idsExistentes].filter((id) => !idsEnviados.has(id));
   if (idsAEliminar.length) {
     await conn.query(
-      "DELETE FROM items_recepcion_medicamentos WHERE id IN (?)",
+      "DELETE FROM items_recepcion_inventario WHERE id IN (?)",
       [idsAEliminar],
     );
   }
@@ -130,7 +130,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
 
     if (m.id && idsExistentes.has(Number(m.id))) {
       await conn.query(
-        `UPDATE items_recepcion_medicamentos SET
+        `UPDATE items_recepcion_inventario SET
            catalogo_id=?, tipo_recepcion=?, codigo_interno=?, nombre=?, presentacion_comercial=?,
            concentracion=?, ium=?, unidad_medida=?, fecha_vencimiento=?, registro_sanitario=?,
            estado_registro=?, cum=?, atc=?, laboratorio=?, clasificacion_riesgo=?, vida_util=?,
@@ -142,7 +142,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
       );
     } else {
       await conn.query(
-        `INSERT INTO items_recepcion_medicamentos
+        `INSERT INTO items_recepcion_inventario
            (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
             concentracion, ium, unidad_medida,
             fecha_vencimiento, registro_sanitario, estado_registro,
@@ -191,7 +191,7 @@ const saveBorrador = async (data, userId, empresaId) => {
     if (recepcionId) {
       // Verificar que el borrador pertenece a este usuario y empresa
       const [[existente]] = await conn.query(
-        `SELECT id FROM recepciones_medicamentos
+        `SELECT id FROM recepciones_inventario
          WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR' AND deleted_at IS NULL`,
         [recepcionId, userId, empresaId],
       );
@@ -201,7 +201,7 @@ const saveBorrador = async (data, userId, empresaId) => {
     if (recepcionId) {
       // Actualizar cabecera del borrador existente
       await conn.query(
-        `UPDATE recepciones_medicamentos SET
+        `UPDATE recepciones_inventario SET
            fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
            proveedor = ?, remision_factura = ?, reactivos = ?, responsable_recibe = ?
          WHERE id = ?`,
@@ -221,7 +221,7 @@ const saveBorrador = async (data, userId, empresaId) => {
     } else {
       // Crear borrador nuevo
       const [result] = await conn.query(
-        `INSERT INTO recepciones_medicamentos
+        `INSERT INTO recepciones_inventario
            (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
             remision_factura, reactivos, responsable_recibe, estado, created_by)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -257,7 +257,7 @@ const saveBorrador = async (data, userId, empresaId) => {
 // ── BORRADOR: eliminar ────────────────────────────────────────────────────────
 const deleteBorrador = async (id, userId, empresaId) => {
   const [result] = await pool.query(
-    `UPDATE recepciones_medicamentos SET deleted_at = NOW()
+    `UPDATE recepciones_inventario SET deleted_at = NOW()
      WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR' AND deleted_at IS NULL`,
     [id, userId, empresaId],
   );
@@ -286,7 +286,7 @@ const create = async (data, userId, empresaId) => {
     await conn.beginTransaction();
 
     const [result] = await conn.query(
-      `INSERT INTO recepciones_medicamentos
+      `INSERT INTO recepciones_inventario
          (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
           remision_factura, reactivos, responsable_recibe, estado, created_by)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -312,7 +312,7 @@ const create = async (data, userId, empresaId) => {
     // Si venía de un borrador, eliminarlo
     if (borradorId) {
       await conn.query(
-        `UPDATE recepciones_medicamentos SET deleted_at = NOW()
+        `UPDATE recepciones_inventario SET deleted_at = NOW()
          WHERE id = ? AND created_by = ? AND empresa_id = ? AND estado = 'BORRADOR'`,
         [borradorId, userId, empresaId],
       );
@@ -330,7 +330,7 @@ const create = async (data, userId, empresaId) => {
 
 const softDelete = async (id, empresaId) => {
   const [result] = await pool.query(
-    `UPDATE recepciones_medicamentos SET deleted_at = NOW()
+    `UPDATE recepciones_inventario SET deleted_at = NOW()
      WHERE id = ? AND empresa_id = ? AND deleted_at IS NULL`,
     [id, empresaId],
   );
@@ -380,8 +380,8 @@ const findAllItems = async (empresaId, userId, rolId) => {
              WHERE di2.item_id = i.id AND d.estado IN ('PENDIENTE','ACEPTADO')
              ORDER BY d.created_at DESC LIMIT 1
             ) AS dispensacion_activa
-     FROM items_recepcion_medicamentos i
-     JOIN recepciones_medicamentos r ON r.id = i.recepcion_id
+     FROM items_recepcion_inventario i
+     JOIN recepciones_inventario r ON r.id = i.recepcion_id
      LEFT JOIN salidas_medicamentos s ON s.item_id = i.id
      WHERE ${where}
      GROUP BY i.id
@@ -408,8 +408,8 @@ const createSalida = async (data, userId, empresaId) => {
             COALESCE(SUM(CASE WHEN s.estado != 'RECHAZADO' THEN s.cantidad ELSE 0 END), 0) AS total_salidas,
             r.municipio_id AS municipio_origen_id,
             r.sede_id      AS sede_origen_id
-     FROM items_recepcion_medicamentos i
-     JOIN recepciones_medicamentos r ON r.id = i.recepcion_id
+     FROM items_recepcion_inventario i
+     JOIN recepciones_inventario r ON r.id = i.recepcion_id
      LEFT JOIN salidas_medicamentos s ON s.item_id = i.id
      WHERE i.id = ? AND r.empresa_id = ?
      GROUP BY i.id`,
@@ -487,8 +487,8 @@ const getSalidasByItem = async (itemId, empresaId) => {
             s.estado, s.municipio_destino_id, s.sede_destino_id, s.created_at,
             mu.nombre AS municipio_destino, se.nombre AS sede_destino
      FROM salidas_medicamentos s
-     JOIN items_recepcion_medicamentos i ON i.id = s.item_id
-     JOIN recepciones_medicamentos r     ON r.id = i.recepcion_id
+     JOIN items_recepcion_inventario i ON i.id = s.item_id
+     JOIN recepciones_inventario r     ON r.id = i.recepcion_id
      LEFT JOIN municipios mu ON mu.id = s.municipio_destino_id
      LEFT JOIN sedes      se ON se.id = s.sede_destino_id
      WHERE s.item_id = ? AND r.empresa_id = ?

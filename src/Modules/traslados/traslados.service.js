@@ -50,7 +50,7 @@ const confirmar = async (trasladoId, empresaId, userId, responsableDestino) => {
             i.cum, i.atc, i.laboratorio, i.cadena_frio, i.temperatura,
             i.snna, i.cod, i.acr, i.estado_empaque
      FROM traslados_pendientes t
-     JOIN items_recepcion_medicamentos i ON i.id = t.item_id
+     JOIN items_recepcion_inventario i ON i.id = t.item_id
      WHERE t.id = ? AND t.empresa_id = ? AND t.estado = 'PENDIENTE'`,
     [trasladoId, empresaId]
   );
@@ -65,7 +65,7 @@ const confirmar = async (trasladoId, empresaId, userId, responsableDestino) => {
     const hora = new Date().toTimeString().slice(0, 8);
 
     const [recResult] = await conn.query(
-      `INSERT INTO recepciones_medicamentos
+      `INSERT INTO recepciones_inventario
          (empresa_id, fecha, hora, municipio_id, sede_id,
           proveedor, remision_factura, responsable_recibe, created_by)
        VALUES (?, ?, ?, ?, ?, 'Traslado interno', ?, ?, ?)`,
@@ -82,7 +82,7 @@ const confirmar = async (trasladoId, empresaId, userId, responsableDestino) => {
 
     // Copiar ítem con la cantidad trasladada
     await conn.query(
-      `INSERT INTO items_recepcion_medicamentos
+      `INSERT INTO items_recepcion_inventario
          (recepcion_id, nombre, codigo_interno, presentacion_comercial, concentracion,
           fecha_vencimiento, lote, registro_sanitario, estado_registro,
           cum, atc, laboratorio, cant_recepcionada, cant_solicitada,

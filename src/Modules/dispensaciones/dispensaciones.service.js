@@ -63,8 +63,8 @@ const crear = async (data, directorId, empresaId) => {
     if (!municipio_id) {
       const [[itemRec]] = await conn.query(
         `SELECT r.municipio_id
-         FROM items_recepcion_medicamentos i
-         JOIN recepciones_medicamentos r ON r.id = i.recepcion_id
+         FROM items_recepcion_inventario i
+         JOIN recepciones_inventario r ON r.id = i.recepcion_id
          WHERE i.id = ? AND r.empresa_id = ?
          LIMIT 1`,
         [items[0].item_id, empresaId]
@@ -95,8 +95,8 @@ const crear = async (data, directorId, empresaId) => {
                 COALESCE(SUM(
                   CASE WHEN s.estado != 'RECHAZADO' THEN s.cantidad ELSE 0 END
                 ), 0) AS total_salidas
-         FROM items_recepcion_medicamentos i
-         JOIN recepciones_medicamentos r ON r.id = i.recepcion_id
+         FROM items_recepcion_inventario i
+         JOIN recepciones_inventario r ON r.id = i.recepcion_id
          LEFT JOIN salidas_medicamentos s ON s.item_id = i.id
          WHERE i.id = ? AND r.empresa_id = ?
          GROUP BY i.id`,
