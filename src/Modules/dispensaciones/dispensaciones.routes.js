@@ -50,6 +50,17 @@ router.get('/', authorize(...SALUD_ADMIN), async (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GET /dispensaciones/pendientes/mias
+// Dispensaciones PENDIENTES asignadas al usuario autenticado (para la campana).
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/pendientes/mias', authorize(...SALUD_ADMIN), async (req, res, next) => {
+  try {
+    const data = await svc.pendientesParaUsuario(req.user.id, req.user.empresa_id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // GET /dispensaciones/:id
 // Detalle de una dispensación con su lista de medicamentos.
 // ─────────────────────────────────────────────────────────────────────────────

@@ -323,4 +323,21 @@ const rechazar = async (dispensacionId, empresaId, userId) => {
   });
 };
 
-module.exports = { crear, listar, detalle, aceptar, rechazar };
+const pendientesParaUsuario = async (userId, empresaId) => {
+  const [rows] = await pool.query(
+    `SELECT d.id, d.tipo, d.observaciones, d.created_at,
+            CONCAT(ud.nombres, ' ', ud.apellidos) AS director_nombre,
+            COUNT(di.id) AS total_items,
+            COALESCE(SUM(di.cantidad), 0) AS total_unidades
+     FROM dispensaciones d
+     JOIN users ud ON ud.id = d.director_id
+     LEFT JOIN dispensacion_items di ON di.dispensacion_id = d.id
+     WHERE d.destinatario_id = ? AND d.empresa_id = ? AND d.estado = 'PENDIENTE'
+     GROUP BY d.id
+     ORDER BY d.created_at DESC`,
+    [userId, empresaId]
+  );
+  return rows;
+};
+
+module.exports = { crear, listar, detalle, aceptar, rechazar, pendientesParaUsuario };
