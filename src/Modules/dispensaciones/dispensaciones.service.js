@@ -16,7 +16,7 @@ const { logAudit }   = require('../../utils/auditLog');
 // Se usa cargo en texto porque los roles del sistema (ADMIN/INGENIERO/SALUD)
 // son demasiado generales; el cargo es más específico (ej: "Director Tecnico").
 // ─────────────────────────────────────────────────────────────────────────────
-const TIPOS_TODOS = ['KIT', 'URGENCIAS', 'HOSPITALIZACION', 'CARRO_PARO'];
+const TIPOS_TODOS = ['KIT', 'URGENCIAS', 'HOSPITALIZACION', 'CARRO_PARO', 'AMBULANCIAS'];
 
 function tiposPermitidos(cargo = '') {
   const c = cargo.toLowerCase();

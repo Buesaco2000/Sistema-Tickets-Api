@@ -7,7 +7,7 @@ const itemSchema = z.object({
 
 const crearSchema = z.object({
   body: z.object({
-    tipo:            z.enum(['KIT', 'URGENCIAS', 'HOSPITALIZACION', 'CARRO_PARO'], {
+    tipo:            z.enum(['KIT', 'URGENCIAS', 'HOSPITALIZACION', 'CARRO_PARO', 'AMBULANCIAS'], {
                        errorMap: () => ({ message: 'Tipo de dispensación no válido.' }),
                      }),
     destinatario_id: z.number({ required_error: 'destinatario_id requerido.' }).int().positive(),
