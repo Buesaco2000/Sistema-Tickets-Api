@@ -65,8 +65,6 @@ const findBorradorByUser = async (userId, empresaId) => {
 };
 
 // ── Función interna: sincroniza los ítems de un borrador/recepción ────────────
-// Actualiza los que ya existen (traen `id`), inserta los nuevos (sin `id`)
-// y elimina los que estaban en BD pero ya no vienen en el payload.
 const _syncItems = async (conn, recepcionId, medicamentos) => {
   const items = Array.isArray(medicamentos) ? medicamentos : [];
 
@@ -369,26 +367,57 @@ const findAllItems = async (empresaId, userId, rolId) => {
             i.codigo_interno, i.nombre, i.presentacion_comercial,
             i.concentracion, i.fecha_vencimiento, i.lote,
             i.cant_solicitada, i.cant_recepcionada,
-            COALESCE(SUM(CASE WHEN s.estado != 'RECHAZADO' THEN s.cantidad ELSE 0 END), 0) AS total_salidas,
-            GREATEST(0, COALESCE(i.cant_recepcionada, 0)
-                      - COALESCE(SUM(CASE WHEN s.estado != 'RECHAZADO' THEN s.cantidad ELSE 0 END), 0)) AS stock,
-            r.fecha AS fecha_recepcion, r.proveedor,
-            (SELECT CONCAT(d.tipo, '|', CONCAT(u.nombres, ' ', u.apellidos))
-             FROM dispensacion_items di2
-             JOIN dispensaciones d ON d.id = di2.dispensacion_id
-             JOIN users u ON u.id = d.destinatario_id
-             WHERE di2.item_id = i.id AND d.estado IN ('PENDIENTE','ACEPTADO')
-             ORDER BY d.created_at DESC LIMIT 1
-            ) AS dispensacion_activa
+            GREATEST(0,
+              COALESCE(i.cant_recepcionada, 0)
+              - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+              - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                          JOIN dispensaciones d ON d.id = di.dispensacion_id
+                          WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+            ) AS stock,
+            r.fecha AS fecha_recepcion, r.proveedor
      FROM items_recepcion_inventario i
      JOIN recepciones_inventario r ON r.id = i.recepcion_id
-     LEFT JOIN salidas_medicamentos s ON s.item_id = i.id
      WHERE ${where}
      GROUP BY i.id
      ORDER BY i.nombre ASC`,
     params,
   );
-  return rows;
+
+  if (!rows.length) return rows;
+
+  const itemIds = rows.map((r) => r.id);
+  const [dispensaciones] = await pool.query(
+    `SELECT di.item_id, d.tipo, SUM(di.cantidad) AS cantidad,
+            CONCAT(u.nombres, ' ', u.apellidos) AS destinatario
+     FROM dispensacion_items di
+     JOIN dispensaciones d ON d.id = di.dispensacion_id
+     JOIN users u ON u.id = d.destinatario_id
+     WHERE di.item_id IN (?) AND d.estado IN ('PENDIENTE','ACEPTADO')
+     GROUP BY di.item_id, d.tipo, d.destinatario_id
+     ORDER BY cantidad DESC`,
+    [itemIds]
+  );
+
+  const dispMap = {};
+  for (const d of dispensaciones) {
+    if (!dispMap[d.item_id]) dispMap[d.item_id] = [];
+    dispMap[d.item_id].push({
+      tipo: d.tipo,
+      cantidad: Number(d.cantidad),
+      destinatario: d.destinatario,
+    });
+  }
+
+  const resultado = [];
+  for (const row of rows) {
+    row.dispensaciones = dispMap[row.id] || [];
+    if (row.stock > 0 || row.dispensaciones.length > 0) {
+      resultado.push(row);
+    }
+  }
+
+  return resultado;
 };
 
 const createSalida = async (data, userId, empresaId) => {
@@ -405,19 +434,22 @@ const createSalida = async (data, userId, empresaId) => {
   const [[item]] = await pool.query(
     `SELECT i.id, i.nombre,
             COALESCE(i.cant_recepcionada, 0) AS cant_recepcionada,
-            COALESCE(SUM(CASE WHEN s.estado != 'RECHAZADO' THEN s.cantidad ELSE 0 END), 0) AS total_salidas,
+            COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                      WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0) AS total_salidas,
+            COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                      JOIN dispensaciones d ON d.id = di.dispensacion_id
+                      WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0) AS total_dispensado,
             r.municipio_id AS municipio_origen_id,
             r.sede_id      AS sede_origen_id
      FROM items_recepcion_inventario i
      JOIN recepciones_inventario r ON r.id = i.recepcion_id
-     LEFT JOIN salidas_medicamentos s ON s.item_id = i.id
      WHERE i.id = ? AND r.empresa_id = ?
      GROUP BY i.id`,
     [item_id, empresaId],
   );
   if (!item) throw new AppError("Ítem no encontrado.", 404);
 
-  const stock = Math.max(0, item.cant_recepcionada - item.total_salidas);
+  const stock = Math.max(0, item.cant_recepcionada - item.total_salidas - item.total_dispensado);
   if (cantidad > stock) {
     throw new AppError(`Stock insuficiente. Disponible: ${stock}`, 400);
   }
@@ -498,6 +530,25 @@ const getSalidasByItem = async (itemId, empresaId) => {
   return rows;
 };
 
+const getDispensacionesByItem = async (itemId, empresaId) => {
+  const [rows] = await pool.query(
+    `SELECT d.tipo, d.estado, di.cantidad,
+            CONCAT(u.nombres, ' ', u.apellidos) AS destinatario,
+            c.nombre AS dest_cargo,
+            d.created_at
+     FROM dispensacion_items di
+     JOIN dispensaciones d ON d.id = di.dispensacion_id
+     JOIN users u ON u.id = d.destinatario_id
+     LEFT JOIN cargos c ON c.id = u.cargo_id
+     JOIN items_recepcion_inventario i ON i.id = di.item_id
+     JOIN recepciones_inventario r ON r.id = i.recepcion_id
+     WHERE di.item_id = ? AND r.empresa_id = ? AND d.estado != 'RECHAZADO'
+     ORDER BY d.created_at DESC`,
+    [itemId, empresaId]
+  );
+  return rows;
+};
+
 module.exports = {
   findAll,
   findAllItems,
@@ -506,6 +557,7 @@ module.exports = {
   softDelete,
   createSalida,
   getSalidasByItem,
+  getDispensacionesByItem,
   findBorradorByUser,
   saveBorrador,
   deleteBorrador,

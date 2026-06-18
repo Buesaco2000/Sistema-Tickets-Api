@@ -22,7 +22,7 @@ router.get('/items', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ── BORRADOR: obtener el borrador activo del usuario autenticado ──────────────
+// ── BORRADOR ─────────────────────────────────────────────────────────────────
 router.get('/borrador/mio', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.findBorradorByUser(req.user.id, req.user.empresa_id);
@@ -30,7 +30,6 @@ router.get('/borrador/mio', authorize(...SALUD_ADMIN_ING), async (req, res, next
   } catch (err) { next(err); }
 });
 
-// ── BORRADOR: guardar o actualizar borrador ───────────────────────────────────
 router.post('/borrador', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.saveBorrador(req.body, req.user.id, req.user.empresa_id);
@@ -38,7 +37,6 @@ router.post('/borrador', authorize(...SALUD_ADMIN_ING), async (req, res, next) =
   } catch (err) { next(err); }
 });
 
-// ── BORRADOR: eliminar borrador ───────────────────────────────────────────────
 router.delete('/borrador/:id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     await svc.deleteBorrador(Number(req.params.id), req.user.id, req.user.empresa_id);
@@ -46,6 +44,30 @@ router.delete('/borrador/:id', authorize(...SALUD_ADMIN_ING), async (req, res, n
   } catch (err) { next(err); }
 });
 
+// ── SALIDAS ──────────────────────────────────────────────────────────────────
+router.post('/salidas', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const id = await svc.createSalida(req.body, req.user.id, req.user.empresa_id);
+    res.status(201).json({ success: true, data: { id } });
+  } catch (err) { next(err); }
+});
+
+router.get('/salidas/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.getSalidasByItem(Number(req.params.item_id), req.user.empresa_id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// ── DISPENSACIONES ───────────────────────────────────────────────────────────
+router.get('/dispensaciones/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.getDispensacionesByItem(Number(req.params.item_id), req.user.empresa_id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+// ── CRUD recepción (/:id al final para no interceptar rutas con prefijo) ────
 router.post('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.create(req.body, req.user.id, req.user.empresa_id);
@@ -64,20 +86,6 @@ router.delete('/:id', authorize(ROLES.ADMIN), async (req, res, next) => {
   try {
     await svc.softDelete(Number(req.params.id), req.user.empresa_id);
     res.json({ success: true });
-  } catch (err) { next(err); }
-});
-
-router.post('/salidas', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
-  try {
-    const id = await svc.createSalida(req.body, req.user.id, req.user.empresa_id);
-    res.status(201).json({ success: true, data: { id } });
-  } catch (err) { next(err); }
-});
-
-router.get('/salidas/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
-  try {
-    const data = await svc.getSalidasByItem(Number(req.params.item_id), req.user.empresa_id);
-    res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 

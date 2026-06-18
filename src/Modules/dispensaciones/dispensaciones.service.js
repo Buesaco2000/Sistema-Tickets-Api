@@ -92,19 +92,20 @@ const crear = async (data, directorId, empresaId) => {
       const [[item]] = await conn.query(
         `SELECT i.id, i.nombre, i.lote, i.fecha_vencimiento,
                 COALESCE(i.cant_recepcionada, 0) AS cant_recepcionada,
-                COALESCE(SUM(
-                  CASE WHEN s.estado != 'RECHAZADO' THEN s.cantidad ELSE 0 END
-                ), 0) AS total_salidas
+                COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0) AS total_salidas,
+                COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                          JOIN dispensaciones d ON d.id = di.dispensacion_id
+                          WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0) AS total_dispensado
          FROM items_recepcion_inventario i
          JOIN recepciones_inventario r ON r.id = i.recepcion_id
-         LEFT JOIN salidas_medicamentos s ON s.item_id = i.id
          WHERE i.id = ? AND r.empresa_id = ?
          GROUP BY i.id`,
         [it.item_id, empresaId]
       );
       if (!item) throw new AppError(`Ítem ${it.item_id} no encontrado.`, 404);
 
-      const stockDisponible = Math.max(0, item.cant_recepcionada - item.total_salidas);
+      const stockDisponible = Math.max(0, item.cant_recepcionada - item.total_salidas - item.total_dispensado);
       if (it.cantidad > stockDisponible)
         throw new AppError(
           `Stock insuficiente para "${item.nombre}". Disponible: ${stockDisponible}`,

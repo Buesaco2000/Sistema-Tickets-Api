@@ -13,7 +13,6 @@ const auditLogger  = require("./src/Middlewares/auditLogger.middleware");
 
 const app = express();
 
-// Necesario para que express-rate-limit y los logs de morgan
 // usen la IP real del cliente cuando hay nginx/proxy delante.
 app.set("trust proxy", 1);
 
@@ -75,8 +74,6 @@ if (process.env.NODE_ENV !== "test") {
 app.use(auditLogger);
 
 // ─── Static files ────────────────────────────────────────────
-// Cross-Origin-Resource-Policy debe ser cross-origin para que el frontend
-// en un puerto distinto (Vite :5173) pueda cargar imágenes y PDFs.
 app.use("/public", (req, res, next) => {
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();
@@ -157,6 +154,7 @@ v1.use("/medicamentos",               crearCatalogoItemsRouter('MEDICAMENTOS'));
 v1.use("/laboratorio",                crearCatalogoItemsRouter('LABORATORIO'));
 v1.use("/medico-quirurgico",          crearCatalogoItemsRouter('MEDICO_QUIRURGICO'));
 v1.use("/aseo-papeleria",             crearCatalogoItemsRouter('ASEO_PAPELERIA'));
+v1.use("/odontologia",                crearCatalogoItemsRouter('ODONTOLOGIA'));
 
 app.use("/api/v1", v1);
 
