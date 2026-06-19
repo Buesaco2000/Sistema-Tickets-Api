@@ -334,20 +334,10 @@ const softDelete = async (id, empresaId) => {
   if (!result.affectedRows) throw new AppError("Recepción no encontrada.", 404);
 };
 
-// Determina si el cargo es Director Técnico o Almacén (ven inventario de almacén)
-const _esCargoAlmacen = async (cargoId) => {
-  if (!cargoId) return false;
-  const [[cargo]] = await pool.query(
-    "SELECT nombre FROM cargos WHERE id = ?",
-    [cargoId],
-  );
-  const c = (cargo?.nombre || "").toLowerCase();
-  return c.includes("director tecnico") || c.includes("almacen");
-};
-
 // Solo ítems de recepciones COMPLETADAS (borradores no tienen stock)
-const findAllItems = async (empresaId, userId, rolId, cargoId) => {
-  const esAlmacen = await _esCargoAlmacen(cargoId);
+const findAllItems = async (empresaId, userId, rolId, cargo) => {
+  const c = (cargo || "").toLowerCase();
+  const esAlmacen = c.includes("director tecnico") || c.includes("almacen");
 
   // ── Si NO es Admin ni Director/Almacén → mostrar dispensaciones aceptadas ──
   if (rolId !== ROLES.ADMIN && !esAlmacen) {
