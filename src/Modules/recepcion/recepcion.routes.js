@@ -17,7 +17,7 @@ router.get('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
 
 router.get('/items', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
-    const data = await svc.findAllItems(req.user.empresa_id, req.user.id, req.user.rol_id);
+    const data = await svc.findAllItems(req.user.empresa_id, req.user.id, req.user.rol_id, req.user.cargo_id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

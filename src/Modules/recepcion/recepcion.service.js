@@ -79,10 +79,9 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
 
   const idsAEliminar = [...idsExistentes].filter((id) => !idsEnviados.has(id));
   if (idsAEliminar.length) {
-    await conn.query(
-      "DELETE FROM items_recepcion_inventario WHERE id IN (?)",
-      [idsAEliminar],
-    );
+    await conn.query("DELETE FROM items_recepcion_inventario WHERE id IN (?)", [
+      idsAEliminar,
+    ]);
   }
 
   for (const m of items) {
@@ -335,8 +334,59 @@ const softDelete = async (id, empresaId) => {
   if (!result.affectedRows) throw new AppError("Recepción no encontrada.", 404);
 };
 
+// Determina si el cargo es Director Técnico o Almacén (ven inventario de almacén)
+const _esCargoAlmacen = async (cargoId) => {
+  if (!cargoId) return false;
+  const [[cargo]] = await pool.query(
+    "SELECT nombre FROM cargos WHERE id = ?",
+    [cargoId],
+  );
+  const c = (cargo?.nombre || "").toLowerCase();
+  return c.includes("director tecnico") || c.includes("almacen");
+};
+
 // Solo ítems de recepciones COMPLETADAS (borradores no tienen stock)
-const findAllItems = async (empresaId, userId, rolId) => {
+const findAllItems = async (empresaId, userId, rolId, cargoId) => {
+  const esAlmacen = await _esCargoAlmacen(cargoId);
+
+  // ── Si NO es Admin ni Director/Almacén → mostrar dispensaciones aceptadas ──
+  if (rolId !== ROLES.ADMIN && !esAlmacen) {
+    const [rowsDest] = await pool.query(
+      `SELECT di.id, di.item_id AS recepcion_id,
+              d.tipo AS tipo_recepcion,
+              i.codigo_interno, di.medicamento_nombre AS nombre,
+              i.presentacion_comercial, i.concentracion,
+              i.fecha_vencimiento, i.lote,
+              di.cantidad AS cant_solicitada,
+              di.cantidad AS cant_recepcionada,
+              GREATEST(0,
+                di.cantidad
+                - COALESCE((SELECT SUM(s.cantidad)
+                            FROM salidas_medicamentos s
+                            WHERE s.dispensacion_item_id = di.id
+                              AND s.estado != 'RECHAZADO'), 0)
+              ) AS stock,
+              d.created_at AS fecha_recepcion,
+              CONCAT(ud.nombres, ' ', ud.apellidos) AS proveedor
+       FROM dispensacion_items di
+       JOIN dispensaciones d ON d.id = di.dispensacion_id
+       JOIN items_recepcion_inventario i ON i.id = di.item_id
+       JOIN users ud ON ud.id = d.director_id
+       WHERE d.destinatario_id = ?
+         AND d.empresa_id = ?
+         AND d.estado = 'ACEPTADO'
+       ORDER BY di.medicamento_nombre ASC`,
+      [userId, empresaId],
+    );
+
+    for (const row of rowsDest) {
+      row.dispensaciones = [];
+    }
+
+    return rowsDest.filter((r) => r.stock > 0);
+  }
+
+  // ── Admin / Director Técnico / Almacén → inventario del almacén ────────────
   let municipioId = null;
 
   if (rolId !== ROLES.ADMIN) {
@@ -396,7 +446,7 @@ const findAllItems = async (empresaId, userId, rolId) => {
      WHERE di.item_id IN (?) AND d.estado IN ('PENDIENTE','ACEPTADO')
      GROUP BY di.item_id, d.tipo, d.destinatario_id
      ORDER BY cantidad DESC`,
-    [itemIds]
+    [itemIds],
   );
 
   const dispMap = {};
@@ -449,7 +499,10 @@ const createSalida = async (data, userId, empresaId) => {
   );
   if (!item) throw new AppError("Ítem no encontrado.", 404);
 
-  const stock = Math.max(0, item.cant_recepcionada - item.total_salidas - item.total_dispensado);
+  const stock = Math.max(
+    0,
+    item.cant_recepcionada - item.total_salidas - item.total_dispensado,
+  );
   if (cantidad > stock) {
     throw new AppError(`Stock insuficiente. Disponible: ${stock}`, 400);
   }
@@ -544,7 +597,7 @@ const getDispensacionesByItem = async (itemId, empresaId) => {
      JOIN recepciones_inventario r ON r.id = i.recepcion_id
      WHERE di.item_id = ? AND r.empresa_id = ? AND d.estado != 'RECHAZADO'
      ORDER BY d.created_at DESC`,
-    [itemId, empresaId]
+    [itemId, empresaId],
   );
   return rows;
 };
