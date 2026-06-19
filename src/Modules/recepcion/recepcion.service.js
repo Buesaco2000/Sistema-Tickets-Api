@@ -342,8 +342,8 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
   // ── Si NO es Admin ni Director/Almacén → mostrar dispensaciones aceptadas ──
   if (rolId !== ROLES.ADMIN && !esAlmacen) {
     const [rowsDest] = await pool.query(
-      `SELECT di.id, di.item_id AS recepcion_id,
-              d.tipo AS tipo_recepcion,
+      `SELECT i.id, i.recepcion_id,
+              i.tipo_recepcion,
               i.codigo_interno, di.medicamento_nombre AS nombre,
               i.presentacion_comercial, i.concentracion,
               i.fecha_vencimiento, i.lote,
@@ -577,6 +577,7 @@ const getDispensacionesByItem = async (itemId, empresaId) => {
   const [rows] = await pool.query(
     `SELECT d.tipo, d.estado, di.cantidad,
             CONCAT(u.nombres, ' ', u.apellidos) AS destinatario,
+            d.observaciones,
             c.nombre AS dest_cargo,
             d.created_at
      FROM dispensacion_items di
