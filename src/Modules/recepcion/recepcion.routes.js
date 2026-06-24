@@ -22,6 +22,13 @@ router.get('/items', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/items/reporte', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.findItemsForReport(req.user.empresa_id, req.user.id, req.user.rol_id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
 // ── BORRADOR ─────────────────────────────────────────────────────────────────
 router.get('/borrador/mio', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
@@ -63,6 +70,13 @@ router.get('/salidas/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, 
 router.get('/dispensaciones/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.getDispensacionesByItem(Number(req.params.item_id), req.user.empresa_id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+router.get('/items/:id/trazabilidad', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.getTrazabilidad(Number(req.params.id), req.user.empresa_id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });

@@ -593,15 +593,129 @@ const getDispensacionesByItem = async (itemId, empresaId) => {
   return rows;
 };
 
+const findItemsForReport = async (empresaId, userId, rolId) => {
+  let municipioId = null;
+  if (rolId !== ROLES.ADMIN) {
+    const [[profile]] = await pool.query(
+      'SELECT municipio_id FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if (profile) municipioId = profile.municipio_id;
+  }
+
+  const conds = ['r.empresa_id = ?', 'r.deleted_at IS NULL', "r.estado = 'COMPLETADA'"];
+  const params = [empresaId];
+  if (municipioId) {
+    conds.push('r.municipio_id = ?');
+    params.push(municipioId);
+  }
+
+  const [rows] = await pool.query(
+    `SELECT i.id, i.tipo_recepcion,
+            i.codigo_interno, i.nombre, i.presentacion_comercial,
+            i.concentracion, i.unidad_medida, i.ium,
+            i.fecha_vencimiento, i.lote,
+            i.registro_sanitario, i.estado_registro,
+            i.cum, i.atc, i.laboratorio,
+            i.clasificacion_riesgo, i.vida_util, i.serie,
+            i.cant_solicitada, i.cant_recepcionada,
+            GREATEST(0,
+              COALESCE(i.cant_recepcionada, 0)
+              - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+              - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                          JOIN dispensaciones d ON d.id = di.dispensacion_id
+                          WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+            ) AS stock,
+            i.cadena_frio, i.temperatura,
+            i.snna, i.cod, i.acr, i.estado_empaque,
+            i.humedo, i.colapsado, i.manchado,
+            i.etiquetas, i.tipo_etiquetas,
+            r.fecha AS fecha_recepcion, r.proveedor,
+            r.remision_factura, r.responsable_recibe,
+            mu.nombre AS municipio, se.nombre AS sede
+     FROM items_recepcion_inventario i
+     JOIN recepciones_inventario r ON r.id = i.recepcion_id
+     LEFT JOIN municipios mu ON mu.id = r.municipio_id
+     LEFT JOIN sedes se ON se.id = r.sede_id
+     WHERE ${conds.join(' AND ')}
+     ORDER BY i.tipo_recepcion, i.nombre ASC`,
+    params
+  );
+  return rows;
+};
+
+const getTrazabilidad = async (itemId, empresaId) => {
+  const [[item]] = await pool.query(
+    `SELECT i.*, r.fecha AS fecha_recepcion, r.hora, r.proveedor,
+            r.remision_factura, r.responsable_recibe,
+            mu.nombre AS municipio, se.nombre AS sede
+     FROM items_recepcion_inventario i
+     JOIN recepciones_inventario r ON r.id = i.recepcion_id
+     LEFT JOIN municipios mu ON mu.id = r.municipio_id
+     LEFT JOIN sedes se ON se.id = r.sede_id
+     WHERE i.id = ? AND r.empresa_id = ? AND r.deleted_at IS NULL`,
+    [itemId, empresaId]
+  );
+  if (!item) throw new AppError('Ítem no encontrado.', 404);
+
+  const [salidas] = await pool.query(
+    `SELECT s.id, s.cantidad, s.fecha, s.motivo, s.responsable, s.estado, s.created_at,
+            mu.nombre AS municipio_destino, se.nombre AS sede_destino
+     FROM salidas_medicamentos s
+     LEFT JOIN municipios mu ON mu.id = s.municipio_destino_id
+     LEFT JOIN sedes se ON se.id = s.sede_destino_id
+     WHERE s.item_id = ?
+     ORDER BY s.fecha DESC, s.created_at DESC`,
+    [itemId]
+  );
+
+  const [dispensaciones] = await pool.query(
+    `SELECT d.id, d.tipo, d.estado, d.observaciones, d.created_at,
+            di.cantidad,
+            CONCAT(dir.nombres, ' ', dir.apellidos) AS director,
+            CONCAT(dest.nombres, ' ', dest.apellidos) AS destinatario,
+            c.nombre AS cargo_destinatario
+     FROM dispensacion_items di
+     JOIN dispensaciones d ON d.id = di.dispensacion_id
+     JOIN users dir ON dir.id = d.director_id
+     JOIN users dest ON dest.id = d.destinatario_id
+     LEFT JOIN cargos c ON c.id = dest.cargo_id
+     WHERE di.item_id = ?
+     ORDER BY d.created_at DESC`,
+    [itemId]
+  );
+
+  const [traslados] = await pool.query(
+    `SELECT t.id, t.cantidad, t.estado, t.responsable_origen,
+            t.confirmado_por, t.fecha_confirmacion, t.created_at,
+            mo.nombre AS municipio_origen, so.nombre AS sede_origen,
+            md.nombre AS municipio_destino, sd.nombre AS sede_destino
+     FROM traslados_pendientes t
+     JOIN salidas_medicamentos s ON s.id = t.salida_id
+     LEFT JOIN municipios mo ON mo.id = t.municipio_origen_id
+     LEFT JOIN sedes so ON so.id = t.sede_origen_id
+     LEFT JOIN municipios md ON md.id = t.municipio_destino_id
+     LEFT JOIN sedes sd ON sd.id = t.sede_destino_id
+     WHERE s.item_id = ?
+     ORDER BY t.created_at DESC`,
+    [itemId]
+  );
+
+  return { item, salidas, dispensaciones, traslados };
+};
+
 module.exports = {
   findAll,
   findAllItems,
+  findItemsForReport,
   findById,
   create,
   softDelete,
   createSalida,
   getSalidasByItem,
   getDispensacionesByItem,
+  getTrazabilidad,
   findBorradorByUser,
   saveBorrador,
   deleteBorrador,
