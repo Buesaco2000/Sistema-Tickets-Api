@@ -4,7 +4,7 @@ const AppError = require('../../utils/AppError');
 const search = async (q, empresaId, categoria) => {
   const like = `%${q}%`;
   const [rows] = await pool.query(
-    `SELECT id, codigo_interno, nombre, presentacion, concentracion, precio_2026, precio_regulado
+    `SELECT id, codigo_interno, nombre, forma_farmaceutica, concentracion, precio_2026, precio_regulado
      FROM catalogo_items
      WHERE empresa_id = ? AND categoria = ? AND deleted_at IS NULL
        AND (codigo_interno LIKE ? OR nombre LIKE ?)
@@ -17,7 +17,7 @@ const search = async (q, empresaId, categoria) => {
 
 const findAll = async (empresaId, categoria) => {
   const [rows] = await pool.query(
-    `SELECT id, codigo_interno, nombre, presentacion, concentracion, precio_2026, precio_regulado, created_at
+    `SELECT id, codigo_interno, nombre, forma_farmaceutica, concentracion, precio_2026, precio_regulado, created_at
      FROM catalogo_items
      WHERE empresa_id = ? AND categoria = ? AND deleted_at IS NULL
      ORDER BY codigo_interno ASC`,
@@ -36,12 +36,12 @@ const findById = async (id, empresaId, categoria) => {
 };
 
 const create = async (data, empresaId, categoria) => {
-  const { codigo_interno, nombre, presentacion, concentracion, precio_2026, precio_regulado } = data;
+  const { codigo_interno, nombre, forma_farmaceutica, concentracion, precio_2026, precio_regulado } = data;
   const [result] = await pool.query(
     `INSERT INTO catalogo_items
-       (empresa_id, categoria, codigo_interno, nombre, presentacion, concentracion, precio_2026, precio_regulado)
+       (empresa_id, categoria, codigo_interno, nombre, forma_farmaceutica, concentracion, precio_2026, precio_regulado)
      VALUES (?,?,?,?,?,?,?,?)`,
-    [empresaId, categoria, codigo_interno, nombre, presentacion || null,
+    [empresaId, categoria, codigo_interno, nombre, forma_farmaceutica || null,
      concentracion || null, precio_2026 || null, precio_regulado || null]
   );
   return findById(result.insertId, empresaId, categoria);
@@ -49,7 +49,7 @@ const create = async (data, empresaId, categoria) => {
 
 const update = async (id, data, empresaId, categoria) => {
   await findById(id, empresaId, categoria);
-  const allowed = ['codigo_interno', 'nombre', 'presentacion', 'concentracion', 'precio_2026', 'precio_regulado'];
+  const allowed = ['codigo_interno', 'nombre', 'forma_farmaceutica', 'concentracion', 'precio_2026', 'precio_regulado'];
   const fields = [];
   const values = [];
   for (const key of allowed) {

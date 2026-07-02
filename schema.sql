@@ -628,7 +628,7 @@ CREATE TABLE catalogo_items (
   categoria ENUM('MEDICAMENTOS','LABORATORIO','MEDICO_QUIRURGICO','ASEO_PAPELERIA', 'ODONTOLOGIA') NOT NULL,
   codigo_interno  VARCHAR(100) NOT NULL,
   nombre          VARCHAR(255) NOT NULL,
-  presentacion    VARCHAR(255) DEFAULT NULL,
+  forma_farmaceutica VARCHAR(255) DEFAULT NULL,
   concentracion   VARCHAR(255) DEFAULT NULL,
   precio_2026     VARCHAR(100) DEFAULT NULL,
   precio_regulado VARCHAR(100) DEFAULT NULL,
