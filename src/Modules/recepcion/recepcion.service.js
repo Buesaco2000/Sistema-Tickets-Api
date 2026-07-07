@@ -26,14 +26,12 @@ const findById = async (id, empresaId) => {
 // Solo retorna recepciones COMPLETADAS (borradores no aparecen en el listado)
 const findAll = async (empresaId) => {
   const [rows] = await pool.query(
-    `SELECT r.id, r.fecha, r.hora, r.proveedor, r.remision_factura,
-            r.responsable_recibe, r.created_at,
-            mu.nombre AS municipio, s.nombre AS sede
-     FROM recepciones_inventario r
-     LEFT JOIN municipios mu ON mu.id = r.municipio_id
-     LEFT JOIN sedes      s  ON s.id  = r.sede_id
-     WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
-     ORDER BY r.fecha DESC, r.hora DESC`,
+    `SELECT r.id, r.fecha, r.hora, r.proveedor, r.remision_factura, r.responsable_recibe, r.created_at, 
+    mu.nombre AS municipio, s.nombre AS sede FROM recepciones_inventario r
+    LEFT JOIN municipios mu ON mu.id = r.municipio_id
+    LEFT JOIN sedes      s  ON s.id  = r.sede_id
+    WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
+    ORDER BY r.fecha DESC, r.hora DESC`,
     [empresaId],
   );
   return rows;
@@ -88,7 +86,6 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
     const fechaVencimiento = m.fecha_vencimiento
       ? new Date(m.fecha_vencimiento).toISOString().split("T")[0]
       : null;
-
     const valores = [
       m.catalogo_id || null,
       m.tipo_recepcion || "MEDICAMENTOS",
@@ -124,23 +121,23 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
       m.etiquetas ?? false,
       m.tipo_etiquetas || null,
     ];
-
+    
     if (m.id && idsExistentes.has(Number(m.id))) {
       await conn.query(
         `UPDATE items_recepcion_inventario SET
-           catalogo_id=?, tipo_recepcion=?, codigo_interno=?, nombre=?, presentacion_comercial=?,
-           concentracion=?, ium=?, unidad_medida=?, fecha_vencimiento=?, registro_sanitario=?,
-           estado_registro=?, cum=?, atc=?, laboratorio=?, clasificacion_riesgo=?, vida_util=?,
-           serie=?, cant_solicitada=?, cant_recepcionada=?, cant_faltante=?, lote=?, cadena_frio=?,
-           temperatura=?, snna=?, ta=?, cod=?, acr=?, estado_empaque=?, humedo=?, colapsado=?,
-           manchado=?, etiquetas=?, tipo_etiquetas=?
-         WHERE id = ? AND recepcion_id = ?`,
+          catalogo_id=?, tipo_recepcion=?, codigo_interno=?, nombre=?, presentacion_comercial=?,
+          concentracion=?, ium=?, unidad_medida=?, fecha_vencimiento=?, registro_sanitario=?,
+          estado_registro=?, cum=?, atc=?, laboratorio=?, clasificacion_riesgo=?, vida_util=?,
+          serie=?, cant_solicitada=?, cant_recepcionada=?, cant_faltante=?, lote=?, cadena_frio=?,
+          temperatura=?, snna=?, ta=?, cod=?, acr=?, estado_empaque=?, humedo=?, colapsado=?,
+          manchado=?, etiquetas=?, tipo_etiquetas=?
+        WHERE id = ? AND recepcion_id = ?`,
         [...valores, Number(m.id), recepcionId],
       );
     } else {
       await conn.query(
         `INSERT INTO items_recepcion_inventario
-           (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
+          (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
             concentracion, ium, unidad_medida,
             fecha_vencimiento, registro_sanitario, estado_registro,
             cum, atc, laboratorio,
@@ -149,7 +146,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
             cadena_frio, temperatura, snna, ta, cod, acr,
             estado_empaque,
             humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [recepcionId, ...valores],
       );
     }
@@ -278,6 +275,10 @@ const create = async (data, userId, empresaId) => {
     borradorId,
   } = data;
 
+  const fechaRecepcion = fecha
+    ? new Date(fecha).toISOString().split("T")[0]
+    : null;
+
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -289,7 +290,7 @@ const create = async (data, userId, empresaId) => {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId,
-        fecha,
+        fechaRecepcion,
         hora,
         municipio_id || null,
         sede_id || null,
