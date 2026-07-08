@@ -338,10 +338,12 @@ const softDelete = async (id, empresaId) => {
 // Solo ítems de recepciones COMPLETADAS (borradores no tienen stock)
 const findAllItems = async (empresaId, userId, rolId, cargo) => {
   const c = (cargo || "").toLowerCase();
-  const esAlmacen = c.includes("director tecnico") || c.includes("almacen");
+  const esAlmacen  = c.includes("almacen");
+  const esDirector = c.includes("director tecnico");
+  const esPrivilegiado = esAlmacen || esDirector;
 
   // ── Si NO es Admin ni Director/Almacén → mostrar dispensaciones aceptadas ──
-  if (rolId !== ROLES.ADMIN && !esAlmacen) {
+  if (rolId !== ROLES.ADMIN && !esPrivilegiado) {
     const [rowsDest] = await pool.query(
       `SELECT i.id, i.recepcion_id,
               i.tipo_recepcion,
@@ -378,9 +380,11 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
   }
 
   // ── Admin / Director Técnico / Almacén → inventario del almacén ────────────
+  // Admin: sin filtro. Almacén: sin filtro (todos los municipios).
+  // Director Técnico: solo su municipio.
   let municipioId = null;
 
-  if (rolId !== ROLES.ADMIN) {
+  if (rolId !== ROLES.ADMIN && esDirector) {
     const [[profile]] = await pool.query(
       "SELECT municipio_id FROM users WHERE id = ? LIMIT 1",
       [userId],
