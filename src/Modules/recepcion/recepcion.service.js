@@ -420,9 +420,13 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
                           JOIN dispensaciones d ON d.id = di.dispensacion_id
                           WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
             ) AS stock,
-            r.fecha AS fecha_recepcion, r.proveedor
+            r.fecha AS fecha_recepcion, r.proveedor,
+            mu.nombre AS municipio,
+            se.nombre AS sede
      FROM items_recepcion_inventario i
      JOIN recepciones_inventario r ON r.id = i.recepcion_id
+     LEFT JOIN municipios mu ON mu.id = r.municipio_id
+     LEFT JOIN sedes se ON se.id = r.sede_id
      WHERE ${where}
      GROUP BY i.id
      ORDER BY i.nombre ASC`,
@@ -457,7 +461,7 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
   const resultado = [];
   for (const row of rows) {
     row.dispensaciones = dispMap[row.id] || [];
-    if (row.stock > 0 || row.dispensaciones.length > 0) {
+    if (row.stock > 0) {
       resultado.push(row);
     }
   }
