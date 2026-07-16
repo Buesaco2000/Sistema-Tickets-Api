@@ -16,7 +16,11 @@ const findById = async (id, empresaId) => {
   if (!row) throw new AppError("Recepción no encontrada.", 404);
 
   const [medicamentos] = await pool.query(
-    "SELECT * FROM items_recepcion_inventario WHERE recepcion_id = ? ORDER BY id",
+    `SELECT i.*, c.forma_farmaceutica
+     FROM items_recepcion_inventario i
+     LEFT JOIN catalogo_items c ON c.id = i.catalogo_id
+     WHERE i.recepcion_id = ?
+     ORDER BY i.id`,
     [id],
   );
 
@@ -55,7 +59,11 @@ const findBorradorByUser = async (userId, empresaId) => {
   if (!row) return null;
 
   const [medicamentos] = await pool.query(
-    "SELECT * FROM items_recepcion_inventario WHERE recepcion_id = ? ORDER BY id",
+    `SELECT i.*, c.forma_farmaceutica
+     FROM items_recepcion_inventario i
+     LEFT JOIN catalogo_items c ON c.id = i.catalogo_id
+     WHERE i.recepcion_id = ?
+     ORDER BY i.id`,
     [row.id],
   );
 
