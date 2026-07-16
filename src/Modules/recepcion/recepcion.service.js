@@ -430,11 +430,13 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
             ) AS stock,
             r.fecha AS fecha_recepcion, r.proveedor,
             mu.nombre AS municipio,
-            se.nombre AS sede
+            se.nombre AS sede,
+            c.forma_farmaceutica
      FROM items_recepcion_inventario i
      JOIN recepciones_inventario r ON r.id = i.recepcion_id
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes se ON se.id = r.sede_id
+     LEFT JOIN catalogo_items c ON c.id = i.catalogo_id
      WHERE ${where}
      GROUP BY i.id
      ORDER BY i.nombre ASC`,
