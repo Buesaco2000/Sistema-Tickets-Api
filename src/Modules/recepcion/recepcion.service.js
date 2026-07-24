@@ -612,9 +612,14 @@ const getDispensacionesByItem = async (itemId, empresaId) => {
   return rows;
 };
 
-const findItemsForReport = async (empresaId, userId, rolId) => {
+const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
+  const c = (cargo || "").toLowerCase();
+  const esAlmacen  = c.includes("almacen");
+  const esDirector = c.includes("director tecnico");
+
   let municipioId = null;
-  if (rolId !== ROLES.ADMIN) {
+  // ADMIN, Almacén y Director Técnico ven todos los municipios
+  if (rolId !== ROLES.ADMIN && !esAlmacen && !esDirector) {
     const [[profile]] = await pool.query(
       'SELECT municipio_id FROM users WHERE id = ? LIMIT 1',
       [userId]

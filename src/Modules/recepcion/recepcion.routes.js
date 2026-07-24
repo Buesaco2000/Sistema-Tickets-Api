@@ -24,7 +24,7 @@ router.get('/items', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
 
 router.get('/items/reporte', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
-    const data = await svc.findItemsForReport(req.user.empresa_id, req.user.id, req.user.rol_id);
+    const data = await svc.findItemsForReport(req.user.empresa_id, req.user.id, req.user.rol_id, req.user.cargo);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
