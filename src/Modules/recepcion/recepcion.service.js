@@ -387,21 +387,21 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
     return rowsDest.filter((r) => r.stock > 0);
   }
 
-  // ── Admin / Director Técnico / Almacén → inventario del almacén ────────────
-  // Admin: sin filtro. Almacén: sin filtro (todos los municipios).
-  // Director Técnico con sede_id: solo su sede.
-  // Director Técnico sin sede_id: solo su municipio.
+  // ── Admin / Director Técnico / Almacén -> inventario del almacén 
   let municipioId = null;
   let sedeId = null;
 
   if (rolId !== ROLES.ADMIN && esDirector) {
     const [[profile]] = await pool.query(
-      "SELECT municipio_id, sede_id FROM users WHERE id = ? LIMIT 1",
+      `SELECT u.municipio_id, u.sede_id, s.nombre AS sede_nombre
+       FROM users u LEFT JOIN sedes s ON s.id = u.sede_id
+       WHERE u.id = ? LIMIT 1`,
       [userId],
     );
     if (profile) {
-      sedeId     = profile.sede_id;
       municipioId = profile.municipio_id;
+      const esSanJuan = (profile.sede_nombre || "").toUpperCase().includes("SAN JUAN");
+      if (esSanJuan) sedeId = profile.sede_id;
     }
   }
 
@@ -628,16 +628,19 @@ const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
   let municipioId = null;
   let sedeId = null;
   // ADMIN y Almacén ven todos los municipios sin filtro.
-  // Director Técnico: solo su sede (si tiene) o su municipio.
+  // Director Técnico: filtra por municipio, EXCEPTO San Juan de Villalobos que filtra por sede.
   // Otros roles: solo su municipio.
   if (rolId !== ROLES.ADMIN && !esAlmacen) {
     const [[profile]] = await pool.query(
-      'SELECT municipio_id, sede_id FROM users WHERE id = ? LIMIT 1',
+      `SELECT u.municipio_id, u.sede_id, s.nombre AS sede_nombre
+       FROM users u LEFT JOIN sedes s ON s.id = u.sede_id
+       WHERE u.id = ? LIMIT 1`,
       [userId]
     );
     if (profile) {
-      sedeId     = profile.sede_id;
       municipioId = profile.municipio_id;
+      const esSanJuan = (profile.sede_nombre || "").toUpperCase().includes("SAN JUAN");
+      if (esSanJuan) sedeId = profile.sede_id;
     }
   }
 
