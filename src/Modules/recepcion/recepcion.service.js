@@ -389,15 +389,20 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
 
   // ── Admin / Director Técnico / Almacén → inventario del almacén ────────────
   // Admin: sin filtro. Almacén: sin filtro (todos los municipios).
-  // Director Técnico: solo su municipio.
+  // Director Técnico con sede_id: solo su sede.
+  // Director Técnico sin sede_id: solo su municipio.
   let municipioId = null;
+  let sedeId = null;
 
   if (rolId !== ROLES.ADMIN && esDirector) {
     const [[profile]] = await pool.query(
-      "SELECT municipio_id FROM users WHERE id = ? LIMIT 1",
+      "SELECT municipio_id, sede_id FROM users WHERE id = ? LIMIT 1",
       [userId],
     );
-    if (profile) municipioId = profile.municipio_id;
+    if (profile) {
+      sedeId     = profile.sede_id;
+      municipioId = profile.municipio_id;
+    }
   }
 
   const conds = [
@@ -407,7 +412,10 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
   ];
   const params = [empresaId];
 
-  if (municipioId) {
+  if (sedeId) {
+    conds.push("r.sede_id = ?");
+    params.push(sedeId);
+  } else if (municipioId) {
     conds.push("r.municipio_id = ?");
     params.push(municipioId);
   }
@@ -618,18 +626,27 @@ const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
   const esDirector = c.includes("director tecnico");
 
   let municipioId = null;
-  // ADMIN, Almacén y Director Técnico ven todos los municipios
-  if (rolId !== ROLES.ADMIN && !esAlmacen && !esDirector) {
+  let sedeId = null;
+  // ADMIN y Almacén ven todos los municipios sin filtro.
+  // Director Técnico: solo su sede (si tiene) o su municipio.
+  // Otros roles: solo su municipio.
+  if (rolId !== ROLES.ADMIN && !esAlmacen) {
     const [[profile]] = await pool.query(
-      'SELECT municipio_id FROM users WHERE id = ? LIMIT 1',
+      'SELECT municipio_id, sede_id FROM users WHERE id = ? LIMIT 1',
       [userId]
     );
-    if (profile) municipioId = profile.municipio_id;
+    if (profile) {
+      sedeId     = profile.sede_id;
+      municipioId = profile.municipio_id;
+    }
   }
 
   const conds = ['r.empresa_id = ?', 'r.deleted_at IS NULL', "r.estado = 'COMPLETADA'"];
   const params = [empresaId];
-  if (municipioId) {
+  if (sedeId) {
+    conds.push('r.sede_id = ?');
+    params.push(sedeId);
+  } else if (municipioId) {
     conds.push('r.municipio_id = ?');
     params.push(municipioId);
   }
