@@ -40,7 +40,7 @@ app.use(
   }),
 );
 
-// ─── Rate limiting ───────────────────────────────────────────
+//  Rate limiting 
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
@@ -62,29 +62,29 @@ app.use("/api/", globalLimiter);
 app.use("/api/v1/auth/login",   authLimiter);
 app.use("/api/v1/auth/refresh", authLimiter);
 
-// ─── Parsing ─────────────────────────────────────────────────
+//  Parsing 
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// ─── Logging ─────────────────────────────────────────────────
+//  Logging 
 if (process.env.NODE_ENV !== "test") {
   app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 }
 app.use(auditLogger);
 
-// ─── Static files ────────────────────────────────────────────
+//  Static files 
 app.use("/public", (req, res, next) => {
   res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   next();
 }, express.static("public"));
 
-// ─── Health check (sin auth) ─────────────────────────────────
+//  Health check (sin auth) 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// ─── API v1 ──────────────────────────────────────────────────
+//  API v1 
 const v1 = express.Router();
 
 // RUTAS DE CARPETA AUTH
@@ -148,6 +148,10 @@ v1.use("/recepciones/medicamentos",   require("./src/Modules/recepcion/recepcion
 v1.use("/traslados",                  require("./src/Modules/traslados/traslados.routes.js"));
 v1.use("/dispensaciones",             require("./src/Modules/dispensaciones/dispensaciones.routes.js"));
 
+// RUTAS DE INFORMES
+v1.use("/informes", require("./src/Modules/informes/informes.routes.js"));
+v1.use("obligaciones", require("./src/Modules/informes/obligaciones/obligaciones.routes.js"))
+
 // CATÁLOGOS DE ITEMS (medicamentos, laboratorio, médico-quirúrgico, aseo y papelería)
 const crearCatalogoItemsRouter = require("./src/Modules/catalogoItems/catalogoItems.routes.js");
 v1.use("/medicamentos",               crearCatalogoItemsRouter('MEDICAMENTOS'));
@@ -158,7 +162,7 @@ v1.use("/odontologia",                crearCatalogoItemsRouter('ODONTOLOGIA'));
 
 app.use("/api/v1", v1);
 
-// ─── Error handling ──────────────────────────────────────────
+//  Error handling 
 app.use(notFoundHandler);
 app.use(errorHandler);
 

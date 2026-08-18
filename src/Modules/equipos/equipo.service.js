@@ -2,7 +2,6 @@ const pool     = require('../../config/database');
 const AppError = require('../../utils/AppError');
 const { getPagination, buildMeta } = require('../../utils/pagination');
 
-// ── Aliases use camelCase to match the frontend EquipoBiomedico type ─────────
 const BASE_SELECT = `
   SELECT
     e.id, e.nombre, e.activo_fijo, e.marca, e.modelo,

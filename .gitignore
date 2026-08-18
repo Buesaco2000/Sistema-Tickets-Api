@@ -9,4 +9,3 @@ npm-debug.log*
 uploads/
 /public/
 /src/generated/prisma
-/migrations/

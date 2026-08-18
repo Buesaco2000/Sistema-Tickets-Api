@@ -1,9 +1,4 @@
--- ─────────────────────────────────────────────────────────────────────────────
--- Migración 001 — Índices de performance + tabla audit_log
--- Ejecutar una sola vez contra la BD de producción.
--- ─────────────────────────────────────────────────────────────────────────────
 
--- ── PERF-03: Índices faltantes ────────────────────────────────────────────────
 
 -- dispensaciones: filtros de listar() y aceptar/rechazar
 ALTER TABLE dispensaciones

@@ -11,15 +11,8 @@ const ROLES            = require('../../utils/roles');
 router.use(authenticate);
 
 // Los roles que pueden usar dispensaciones: ADMIN y SALUD
-// (INGENIERO no maneja medicamentos)
 const SALUD_ADMIN = [ROLES.ADMIN, ROLES.SALUD];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /dispensaciones
-// Crea una nueva dispensación.
-// Solo el Director Técnico (rol SALUD) o ADMIN puede crear.
-// req.body: { tipo, municipio_id, destinatario_id, observaciones, items: [{item_id, cantidad}] }
-// ─────────────────────────────────────────────────────────────────────────────
 router.post('/', authorize(...SALUD_ADMIN), validate(crearSchema), async (req, res, next) => {
   try {
     const id = await svc.crear(req.body, req.user.id, req.user.empresa_id);
@@ -27,14 +20,7 @@ router.post('/', authorize(...SALUD_ADMIN), validate(crearSchema), async (req, r
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /dispensaciones
-// Lista dispensaciones. El servicio filtra según el cargo del usuario:
-//   - Director Técnico → las que él creó
-//   - Enfermero Jefe   → las asignadas a él (todos los tipos)
-//   - Auxiliar         → las asignadas a él (solo URGENCIAS y HOSPITALIZACIÓN)
-// req.user.cargo viene del JWT (lo pusimos al hacer login)
-// ─────────────────────────────────────────────────────────────────────────────
+
 router.get('/', authorize(...SALUD_ADMIN), async (req, res, next) => {
   try {
     const pag    = getPagination(req.query);
@@ -49,10 +35,7 @@ router.get('/', authorize(...SALUD_ADMIN), async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /dispensaciones/pendientes/mias
-// Dispensaciones PENDIENTES asignadas al usuario autenticado (para la campana).
-// ─────────────────────────────────────────────────────────────────────────────
+
 router.get('/pendientes/mias', authorize(...SALUD_ADMIN), async (req, res, next) => {
   try {
     const data = await svc.pendientesParaUsuario(req.user.id, req.user.empresa_id);
@@ -60,10 +43,7 @@ router.get('/pendientes/mias', authorize(...SALUD_ADMIN), async (req, res, next)
   } catch (err) { next(err); }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /dispensaciones/:id
-// Detalle de una dispensación con su lista de medicamentos.
-// ─────────────────────────────────────────────────────────────────────────────
+
 router.get('/:id', authorize(...SALUD_ADMIN), validate(idParamSchema), async (req, res, next) => {
   try {
     const data = await svc.detalle(req.params.id, req.user.empresa_id);

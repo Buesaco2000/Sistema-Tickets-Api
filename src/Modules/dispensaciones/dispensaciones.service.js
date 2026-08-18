@@ -4,43 +4,18 @@ const ROLES    = require('../../utils/roles');
 const { buildMeta }  = require('../../utils/pagination');
 const { logAudit }   = require('../../utils/auditLog');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPER: qué tipos puede ver un cargo
-// ─────────────────────────────────────────────────────────────────────────────
-// Regla de negocio:
-//   - Director Técnico → crea y ve todo (filtrado por director_id)
-//   - Enfermero/a Jefe → ve los 4 tipos (asignados a él)
-//   - Auxiliar          → ve solo URGENCIAS y HOSPITALIZACION (asignados a él)
-//   - ADMIN             → ve todo
-//
-// Se usa cargo en texto porque los roles del sistema (ADMIN/INGENIERO/SALUD)
-// son demasiado generales; el cargo es más específico (ej: "Director Tecnico").
-// ─────────────────────────────────────────────────────────────────────────────
+
 const TIPOS_TODOS = ['KIT', 'URGENCIAS', 'HOSPITALIZACION', 'CARRO_PARO', 'AMBULANCIAS'];
 
 function tiposPermitidos(cargo = '') {
   const c = cargo.toLowerCase();
   if (c.includes('director tecnico')) return TIPOS_TODOS;
-  if (c.includes('jefe'))             return TIPOS_TODOS;       // Enfermero/a Jefe
+  if (c.includes('jefe'))             return TIPOS_TODOS;       
   if (c.includes('auxiliar'))         return ['URGENCIAS', 'HOSPITALIZACION'];
-  return TIPOS_TODOS; // fallback: si no hay regla definida, ve todo
+  return TIPOS_TODOS;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CREAR dispensación
-// ─────────────────────────────────────────────────────────────────────────────
-// Recibe:
-//   tipo           → 'KIT' | 'URGENCIAS' | 'HOSPITALIZACION' | 'CARRO_PARO'
-//   municipio_id   → municipio donde se dispensa
-//   destinatario_id→ ID del usuario que recibe
-//   observaciones  → texto opcional
-//   items          → array de { item_id, cantidad }
-//
-// Valida:
-//   1. Que cada item_id exista y pertenezca a la empresa
-//   2. Que la cantidad pedida no supere el stock disponible
-//      (cant_recepcionada - salidas ACTIVAS - dispensaciones PENDIENTES/ACEPTADAS)
-// ─────────────────────────────────────────────────────────────────────────────
+
 const crear = async (data, directorId, empresaId) => {
   const { tipo, destinatario_id, observaciones, items } = data;
 
@@ -86,9 +61,7 @@ const crear = async (data, directorId, empresaId) => {
 
     // Insertar cada medicamento de la dispensación
     for (const it of items) {
-      // Obtener datos del ítem e información de stock
-      // stock = cant_recepcionada - suma de salidas ACTIVAS o PENDIENTES
-      // No contamos las RECHAZADAS porque esas devuelven el stock
+
       const [[item]] = await conn.query(
         `SELECT i.id, i.nombre, i.lote, i.fecha_vencimiento,
                 COALESCE(i.cant_recepcionada, 0) AS cant_recepcionada,
@@ -137,17 +110,7 @@ const crear = async (data, directorId, empresaId) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LISTAR dispensaciones según quién consulta
-// ─────────────────────────────────────────────────────────────────────────────
-// Lógica de visibilidad:
-//   - ADMIN          → ve todas las de la empresa
-//   - Director Técnico → ve las que él creó (director_id = userId)
-//   - Cualquier otro → ve solo las que le asignaron (destinatario_id = userId)
-//                      filtradas por los tipos que su cargo permite
-//
-// En todos los casos se filtra por municipio del usuario (no ADMIN).
-// ─────────────────────────────────────────────────────────────────────────────
+
 const listar = async (empresaId, userId, rolId, cargo, pag = { page: 1, limit: 100, offset: 0 }) => {
   // Si no es ADMIN, obtener municipio del usuario
   let municipioId = null;
@@ -220,9 +183,7 @@ const listar = async (empresaId, userId, rolId, cargo, pag = { page: 1, limit: 1
   return { data: rows, meta: buildMeta(total, page, limit) };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DETALLE de una dispensación (incluye los medicamentos)
-// ─────────────────────────────────────────────────────────────────────────────
+
 const detalle = async (dispensacionId, empresaId) => {
   const [[d]] = await pool.query(
     `SELECT d.id, d.tipo, d.estado, d.observaciones,
@@ -252,12 +213,8 @@ const detalle = async (dispensacionId, empresaId) => {
   return { ...d, items };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // ACEPTAR dispensación
-// ─────────────────────────────────────────────────────────────────────────────
-// Solo la puede aceptar el destinatario (destinatario_id = userId).
-// Cambia estado a ACEPTADO y registra quién aceptó y cuándo.
-// ─────────────────────────────────────────────────────────────────────────────
 const aceptar = async (dispensacionId, empresaId, userId, nombreUsuario) => {
   const [[d]] = await pool.query(
     `SELECT id, destinatario_id, estado
@@ -289,11 +246,8 @@ const aceptar = async (dispensacionId, empresaId, userId, nombreUsuario) => {
   });
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // RECHAZAR dispensación
-// ─────────────────────────────────────────────────────────────────────────────
-// Solo la puede rechazar el destinatario.
-// ─────────────────────────────────────────────────────────────────────────────
 const rechazar = async (dispensacionId, empresaId, userId) => {
   const [[d]] = await pool.query(
     `SELECT id, destinatario_id, estado

@@ -1,0 +1,113 @@
+const obligacionesService = require("./obligaciones.service");
+const { success } = require("../../../utils/response");
+
+const getAll = async (req, res, next) => {
+    try {
+
+        const rows = await obligacionesService.findAll(
+            req.user.empresa_id
+        );
+
+        return success(res, rows);
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+const getCatalogos = async (req, res, next) => {
+    try {
+
+        const data = await obligacionesService.getCatalogos(
+            req.user.empresa_id
+        );
+
+        return success(res, data);
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+const getOne = async (req, res, next) => {
+    try {
+
+        const row = await obligacionesService.findById(
+            req.user.empresa_id,
+            Number(req.params.id)
+        );
+
+        return success(res, row);
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+const create = async (req, res, next) => {
+    try {
+
+        const row = await obligacionesService.create(
+            req.user.empresa_id,
+            req.body,
+            req.user.id
+        );
+
+        return success(
+            res,
+            row,
+            "Obligación creada correctamente.",
+            201
+        );
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+const update = async (req, res, next) => {
+    try {
+
+        const row = await obligacionesService.update(
+            req.user.empresa_id,
+            Number(req.params.id),
+            req.body,
+            req.user.id
+        );
+
+        return success(
+            res,
+            row,
+            "Obligación actualizada correctamente."
+        );
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+const remove = async (req, res, next) => {
+    try {
+
+        await obligacionesService.remove(
+            req.user.empresa_id,
+            Number(req.params.id),
+            req.user.id
+        );
+
+        return success(
+            res,
+            null,
+            "Obligación eliminada correctamente."
+        );
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+
+module.exports = { getAll, getCatalogos, getOne, create, update, remove };
