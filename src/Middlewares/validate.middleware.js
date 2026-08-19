@@ -1,5 +1,3 @@
-// Valida body/query/params contra un schema Zod.
-// Los errores los captura el error handler global.
 const validate = (schema) => (req, res, next) => {
   try {
     const result = schema.parse({

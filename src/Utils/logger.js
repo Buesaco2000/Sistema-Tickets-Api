@@ -1,10 +1,3 @@
-/**
- * Logger — Winston
- * Instalar: npm i winston
- *
- * Niveles:  error > warn > info > http > debug
- * En producción sólo error/warn/info van a archivo; en dev todo va a consola.
- */
 const { createLogger, format, transports } = require('winston');
 const path = require('path');
 

@@ -1,5 +1,5 @@
 const obligacionesService = require("./obligaciones.service");
-const { success } = require("../../../utils/response");
+const { success } = require("../../../Utils/response");
 
 const getAll = async (req, res, next) => {
     try {

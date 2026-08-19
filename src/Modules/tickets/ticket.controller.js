@@ -1,6 +1,6 @@
 const ticketService         = require('./ticket.service');
-const { success, paginated } = require('../../utils/response');
-const { getPagination }      = require('../../utils/pagination');
+const { success, paginated } = require('../../Utils/response');
+const { getPagination }      = require('../../Utils/pagination');
 
 const getAll = async (req, res, next) => {
   try {

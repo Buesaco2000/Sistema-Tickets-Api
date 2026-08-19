@@ -8,7 +8,7 @@ const {
   errorHandler,
   notFoundHandler,
 } = require("./src/Middlewares/error.middleware.js");
-const logger       = require("./src/utils/logger");
+const logger       = require("./src/Utils/logger");
 const auditLogger  = require("./src/Middlewares/auditLogger.middleware");
 
 const app = express();

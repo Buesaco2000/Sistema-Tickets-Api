@@ -2,7 +2,7 @@ const router = require('express').Router();
 const svc    = require('./traslados.service');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
-const ROLES            = require('../../utils/roles');
+const ROLES            = require('../../Utils/roles');
 
 router.use(authenticate);
 
@@ -28,7 +28,7 @@ router.get('/pendientes/count', authorize(...SALUD_ADMIN_ING), async (req, res, 
 router.post('/:id/confirmar', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const responsable = req.body.responsable_destino ||
-      (await require('../../config/database').query(
+      (await require('../../Config/database').query(
         'SELECT CONCAT(nombres," ",apellidos) AS n FROM users WHERE id = ? LIMIT 1',
         [req.user.id]
       ).then(([[r]]) => r?.n ?? 'Desconocido'));

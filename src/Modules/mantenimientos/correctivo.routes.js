@@ -1,11 +1,11 @@
 const router = require("express").Router();
 const { z } = require("zod");
 const ctrl = require("./correctivo.controller");
-const { authenticate } = require("../../middlewares/auth.middleware");
-const { authorize } = require("../../middlewares/rbac.middleware");
-const validate = require("../../middlewares/validate.middleware");
-const ROLES = require("../../utils/roles");
-const { uploadMantImagen } = require("../../utils/uploadFile");
+const { authenticate } = require("../../Middlewares/auth.middleware");
+const { authorize } = require("../../Middlewares/rbac.middleware");
+const validate = require("../../Middlewares/validate.middleware");
+const ROLES = require("../../Utils/roles");
+const { uploadMantImagen } = require("../../Utils/uploadFile");
 
 const idParam = z.object({
   params: z.object({ id: z.string().regex(/^\d+$/).transform(Number) }),

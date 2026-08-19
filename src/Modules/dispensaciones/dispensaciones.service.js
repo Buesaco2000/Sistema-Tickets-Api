@@ -1,8 +1,8 @@
-const pool     = require('../../config/database');
-const AppError = require('../../utils/AppError');
-const ROLES    = require('../../utils/roles');
-const { buildMeta }  = require('../../utils/pagination');
-const { logAudit }   = require('../../utils/auditLog');
+const pool     = require('../../Config/database');
+const AppError = require('../../Utils/AppError');
+const ROLES    = require('../../Utils/roles');
+const { buildMeta }  = require('../../Utils/pagination');
+const { logAudit }   = require('../../Utils/auditLog');
 
 
 const TIPOS_TODOS = ['KIT', 'URGENCIAS', 'HOSPITALIZACION', 'CARRO_PARO', 'AMBULANCIAS'];

@@ -3,9 +3,9 @@ const svc      = require('./dispensaciones.service');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
 const validate         = require('../../Middlewares/validate.middleware');
-const { getPagination } = require('../../utils/pagination');
+const { getPagination } = require('../../Utils/pagination');
 const { crearSchema, idParamSchema } = require('./dispensaciones.schema');
-const ROLES            = require('../../utils/roles');
+const ROLES            = require('../../Utils/roles');
 
 // Todas las rutas requieren sesión activa
 router.use(authenticate);

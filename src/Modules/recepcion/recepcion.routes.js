@@ -2,7 +2,7 @@ const router = require('express').Router();
 const svc    = require('./recepcion.service');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
-const ROLES            = require('../../utils/roles');
+const ROLES            = require('../../Utils/roles');
 
 router.use(authenticate);
 

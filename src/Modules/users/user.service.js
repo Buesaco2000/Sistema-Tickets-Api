@@ -1,8 +1,8 @@
 const bcrypt      = require('bcrypt');
-const pool        = require('../../config/database');
-const AppError    = require('../../utils/AppError');
-const { getPagination, buildMeta } = require('../../utils/pagination');
-const { logAudit } = require('../../utils/auditLog');
+const pool        = require('../../Config/database');
+const AppError    = require('../../Utils/AppError');
+const { getPagination, buildMeta } = require('../../Utils/pagination');
+const { logAudit } = require('../../Utils/auditLog');
 
 const findDirectorio = async (empresaId) => {
   // Devolvemos cargo para que el frontend pueda mostrarlo en el Autocomplete

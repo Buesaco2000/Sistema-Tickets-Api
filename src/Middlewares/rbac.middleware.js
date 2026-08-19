@@ -1,4 +1,4 @@
-const AppError = require('../utils/AppError');
+const AppError = require('../Utils/AppError');
 
 // Verifica que el usuario tenga uno de los roles permitidos
 const authorize = (...allowedRoles) => (req, res, next) => {

@@ -1,5 +1,5 @@
 const authService  = require('./auth.service');
-const { success }  = require('../../utils/response');
+const { success }  = require('../../Utils/response');
 
 const login = async (req, res, next) => {
   try {
@@ -44,7 +44,7 @@ const registerPublic = async (req, res, next) => {
 
 const me = async (req, res, next) => {
   try {
-    const [rows] = await require('../../config/database').query(
+    const [rows] = await require('../../Config/database').query(
       `SELECT u.id, u.nombres, u.apellidos, u.email, u.empresa_id, u.rol_id,
               u.cargo_id, u.municipio_id, u.sede_id, u.telefono, u.activo,
               r.nombre  AS rol,
@@ -59,7 +59,7 @@ const me = async (req, res, next) => {
        WHERE u.id = ? AND u.activo = 1 AND u.deleted_at IS NULL`,
       [req.user.id]
     );
-    if (!rows[0]) return next(new (require('../../utils/AppError'))('Usuario no encontrado.', 404));
+    if (!rows[0]) return next(new (require('../../Utils/AppError'))('Usuario no encontrado.', 404));
     return success(res, rows[0]);
   } catch (err) { next(err); }
 };

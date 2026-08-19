@@ -1,5 +1,5 @@
-const AppError = require('../utils/AppError');
-const logger   = require('../utils/logger');
+const AppError = require('../Utils/AppError');
+const logger   = require('../Utils/logger');
 
 const errorHandler = (err, req, res, _next) => {
   err.statusCode = err.statusCode || 500;

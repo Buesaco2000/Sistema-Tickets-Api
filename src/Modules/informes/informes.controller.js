@@ -1,6 +1,6 @@
 const informesService = require('./informes.service');
-const { success } = require('../../utils/response');
-const AppError = require('../../utils/appError');
+const { success } = require('../../Utils/response');
+const AppError = require('../../Utils/AppError');
 
 const getResumen = async (req, res, next) => {
     try {

@@ -1,10 +1,10 @@
 const bcrypt      = require('bcrypt');
 const jwt         = require('jsonwebtoken');
 const crypto      = require('crypto');
-const pool        = require('../../config/database');
-const AppError    = require('../../utils/AppError');
-const ROLES       = require('../../utils/roles');
-const { sendPasswordReset } = require('../../utils/mailer');
+const pool        = require('../../Config/database');
+const AppError    = require('../../Utils/AppError');
+const ROLES       = require('../../Utils/roles');
+const { sendPasswordReset } = require('../../Utils/mailer');
 
 // COOKIE_SECURE=true solo cuando haya HTTPS configurado
 const useSecure = process.env.COOKIE_SECURE === 'true';

@@ -1,8 +1,8 @@
 const userService           = require('./user.service');
-const { success, paginated } = require('../../utils/response');
-const { getPagination }      = require('../../utils/pagination');
-const AppError               = require('../../utils/AppError');
-const ROLES                  = require('../../utils/roles');
+const { success, paginated } = require('../../Utils/response');
+const { getPagination }      = require('../../Utils/pagination');
+const AppError               = require('../../Utils/AppError');
+const ROLES                  = require('../../Utils/roles');
 
 const getDirectorio = async (req, res, next) => {
   try {

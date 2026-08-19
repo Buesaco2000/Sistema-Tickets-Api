@@ -1,7 +1,7 @@
 const router   = require('express').Router();
-const pool     = require('../../config/database');
+const pool     = require('../../Config/database');
 const { z }    = require('zod');
-const validate = require('../../middlewares/validate.middleware');
+const validate = require('../../Middlewares/validate.middleware');
 
 const createSchema = z.object({
   body: z.object({

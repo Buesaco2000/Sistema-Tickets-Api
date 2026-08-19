@@ -1,4 +1,4 @@
-const pool = require('../config/database');
+const pool = require('../Config/database');
 
 /**
  * Registra una acción de negocio en audit_log.

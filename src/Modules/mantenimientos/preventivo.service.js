@@ -1,6 +1,6 @@
-const pool     = require('../../config/database');
-const AppError = require('../../utils/AppError');
-const { getPagination, buildMeta } = require('../../utils/pagination');
+const pool     = require('../../Config/database');
+const AppError = require('../../Utils/AppError');
+const { getPagination, buildMeta } = require('../../Utils/pagination');
 
 const findAll = async (empresaId, filters, pag) => {
   const { page, limit, offset } = pag;

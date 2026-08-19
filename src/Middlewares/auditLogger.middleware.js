@@ -1,9 +1,4 @@
-/**
- * Middleware de auditoría HTTP
- * Registra cada petición con: método, ruta, usuario, IP, duración, status
- */
-const logger = require('../utils/logger');
-
+const logger = require('../Utils/logger');
 const SKIP_PATHS = ['/health', '/favicon.ico'];
 
 const auditLogger = (req, res, next) => {

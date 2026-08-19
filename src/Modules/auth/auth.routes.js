@@ -2,10 +2,10 @@ const router    = require('express').Router();
 const { z }     = require('zod');
 const rateLimit = require('express-rate-limit');
 const ctrl      = require('./auth.controller');
-const { authenticate } = require('../../middlewares/auth.middleware');
-const { authorize }    = require('../../middlewares/rbac.middleware');
-const validate         = require('../../middlewares/validate.middleware');
-const ROLES            = require('../../utils/roles');
+const { authenticate } = require('../../Middlewares/auth.middleware');
+const { authorize }    = require('../../Middlewares/rbac.middleware');
+const validate         = require('../../Middlewares/validate.middleware');
+const ROLES            = require('../../Utils/roles');
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

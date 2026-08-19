@@ -1,6 +1,6 @@
-const pool = require("../../config/database");
-const AppError = require("../../utils/AppError");
-const ROLES = require("../../utils/roles");
+const pool = require("../../Config/database");
+const AppError = require("../../Utils/AppError");
+const ROLES = require("../../Utils/roles");
 
 const findById = async (id, empresaId) => {
   const [[row]] = await pool.query(

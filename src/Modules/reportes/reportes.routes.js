@@ -7,11 +7,8 @@ const ROLES            = require('../../Utils/roles');
 
 router.use(authenticate);
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 // POST /reportes/log-export
-// Cualquier usuario autenticado puede registrar una exportación.
-// El frontend lo llama silenciosamente después de cada CSV/PDF descargado.
-// ─────────────────────────────────────────────────────────────────────────────
 router.post('/log-export', async (req, res, next) => {
   try {
     const { logAudit } = require('../../Utils/auditLog');
@@ -37,10 +34,7 @@ router.post('/log-export', async (req, res, next) => {
 // Las siguientes rutas solo para ADMIN e INGENIERO
 router.use(authorize(ROLES.ADMIN, ROLES.INGENIERO));
 
-// ─────────────────────────────────────────────────────────────────────────────
 // GET /reportes/historial-exports
-// Devuelve el historial de exportaciones de la empresa (últimas 300)
-// ─────────────────────────────────────────────────────────────────────────────
 router.get('/historial-exports', async (req, res, next) => {
   try {
     const [rows] = await pool.query(

@@ -1,12 +1,12 @@
 const router = require("express").Router();
 const { z } = require("zod");
-const pool = require("../../../config/database");
-const { authenticate } = require("../../../middlewares/auth.middleware");
-const { authorize } = require("../../../middlewares/rbac.middleware");
-const validate = require("../../../middlewares/validate.middleware");
-const { success } = require("../../../utils/response");
-const AppError = require("../../../utils/AppError");
-const ROLES = require("../../../utils/roles");
+const pool = require("../../../Config/database");
+const { authenticate } = require("../../../Middlewares/auth.middleware");
+const { authorize } = require("../../../Middlewares/rbac.middleware");
+const validate = require("../../../Middlewares/validate.middleware");
+const { success } = require("../../../Utils/response");
+const AppError = require("../../../Utils/AppError");
+const ROLES = require("../../../Utils/roles");
 
 const schema = z.object({
   body: z.object({ nombre: z.string().min(2).max(50) }),
