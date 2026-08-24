@@ -1,38 +1,20 @@
-/**
- * assign-cargos-obligaciones.js
- * ─────────────────────────────
- * Lee el campo area_elabora de cada obligacion en la BD y asigna
- * cargo_id automaticamente donde el nombre coincida con un cargo.
- *
- * Para nombres que no coincidan exactamente, define el mapeo
- * en OVERRIDES abajo (area_elabora → nombre del cargo en BD).
- * Pon null para omitir esa area intencionalmente.
- *
- * Uso:  node assign-cargos-obligaciones.js
- */
-
 require("dotenv").config();
 const mysql = require("mysql2/promise");
 
-// ── CONFIGURACIÓN ──────────────────────────────────────────────────────────────
+//  CONFIGURACIÓN 
 const EMPRESA_ID = 1;
 
-// Mapeo manual para nombres que no coinciden exactamente:
-//   "valor en area_elabora" : "nombre exacto del cargo en BD"
-// Pon null para saltarse esa área sin asignar cargo.
 const OVERRIDES = {
-  // area_elabora en BD  →  nombre exacto del cargo en BD
-  "Almacén": "ALMACEN",   // único caso con diferencia de tilde
-  // Agrega aquí cualquier otro que aparezca como ⚠️ SIN COINCIDENCIA
+  "Almacén": "ALMACEN",  
 };
-// ──────────────────────────────────────────────────────────────────────────────
 
 async function main() {
   const pool = await mysql.createPool({
     host:     process.env.DB_HOST     || "localhost",
+    port:     Number(process.env.DB_PORT) || 3306,
     user:     process.env.DB_USER     || "root",
     password: process.env.DB_PASSWORD || "",
-    database: process.env.DB_NAME     || "soporte",
+    database: process.env.DB_DATABASE || process.env.DB_NAME || "soporte",
     waitForConnections: true,
     connectionLimit: 5,
   });
@@ -40,7 +22,6 @@ async function main() {
   const conn = await pool.getConnection();
 
   try {
-    // 1. Cargar cargos de la BD → mapa nombre(lower) → id
     const [cargosRows] = await conn.query(
       "SELECT id, nombre FROM cargos ORDER BY nombre ASC"
     );
@@ -63,22 +44,18 @@ async function main() {
     const areas = areasRows.map(r => r.area_elabora);
     console.log(`📋 Áreas únicas encontradas (${areas.length}):`);
 
-    // 3. Resolver cargo para cada area
-    const plan = []; // { area, cargoId, cargoNombre, accion }
+    const plan = [];
     for (const area of areas) {
       let cargoNombre = null;
 
       if (area in OVERRIDES) {
-        // Mapeo manual definido arriba
         cargoNombre = OVERRIDES[area];
       } else {
-        // Coincidencia exacta insensible a mayúsculas
         const found = cargoIdMap[area.trim().toLowerCase()];
         if (found) cargoNombre = area.trim();
       }
 
       if (cargoNombre === null && area in OVERRIDES) {
-        // null explícito = omitir intencionalmente
         console.log(`   ⏭  "${area}" → omitida (configurada como null)`);
         plan.push({ area, cargoId: null, accion: "omitir" });
       } else if (!cargoNombre) {

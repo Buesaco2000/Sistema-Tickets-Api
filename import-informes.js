@@ -3,7 +3,7 @@ const XLSX  = require("xlsx");
 const mysql = require("mysql2/promise");
 
 //  CONFIGURACIÓN 
-const EXCEL_PATH = "C:/Users/Sebastian/Downloads/Data_Informes_Ver1.xlsx";
+const EXCEL_PATH = process.argv[2] || "C:/Users/Sebastian/Downloads/Data_Informes_Ver1.xlsx";
 const SHEET_NAME = "Data";
 const EMPRESA_ID = 1;
 
