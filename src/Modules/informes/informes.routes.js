@@ -5,6 +5,7 @@ const ctrl = require('./informes.controller');
 const router = Router();
 
 router.get('/resumen', authenticate, ctrl.getResumen);
+router.get('/anios', authenticate, ctrl.getAnios);
 router.get('/', authenticate, ctrl.getAll);
 router.patch('/:id/estado', authenticate, ctrl.cambiarEstado);
 router.post('/:id/evidencias', authenticate, uploadInforme.single('archivo'), ctrl.subirEvidencia);

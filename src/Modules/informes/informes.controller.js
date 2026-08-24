@@ -4,20 +4,24 @@ const AppError = require('../../Utils/AppError');
 
 const getResumen = async (req, res, next) => {
     try {
-        const anio = req.query.anio ? Number(req.query.anio) : new Date().getFullYear();
-        const resumen = await informesService.getResumen(req.user.empresa_id, anio);
+        const anio     = req.query.anio ? Number(req.query.anio) : new Date().getFullYear();
+        const esAdmin  = req.user.rol_id === 1;
+        const cargoId  = esAdmin ? null : (req.user.cargo_id || null);
+        const resumen  = await informesService.getResumen(req.user.empresa_id, anio, cargoId);
         return success(res, resumen);
     } catch (err) { next(err); }
 }
 
 const getAll = async (req, res, next) => {
     try {
+        const esAdmin = req.user.rol_id === 1;
         const filters = {
             anio:      req.query.anio ? Number(req.query.anio) : new Date().getFullYear(),
             estado:    req.query.estado || null,
             texto:     req.query.texto || null,
             soloMios:  req.query.soloMios === 'true', 
-            userId:    req.user.id
+            userId:    req.user.id,
+            cargoId:  esAdmin ? null : (req.user.cargo_id || null),
         };
         const rows = await informesService.findAll(req.user.empresa_id, filters);
         return success(res, rows);
@@ -71,4 +75,13 @@ const remove = async (req, res, next) => {
     } catch (err) { next(err); }
 }
 
-module.exports = { getResumen, getAll, getOne, cambiarEstado, subirEvidencia, remove };
+const getAnios = async (req, res, next) => {
+    try {
+        const esAdmin = req.user.rol_id === 1;
+        const cargoId = esAdmin ? null : (req.user.cargo_id || null);
+        const anios = await informesService.getAniosDisponibles(req.user.empresa_id, cargoId);
+        return success(res, anios);
+    } catch (err) { next(err); }
+};
+
+module.exports = { getResumen, getAnios, getAll, getOne, cambiarEstado, subirEvidencia, remove };

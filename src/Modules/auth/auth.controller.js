@@ -79,4 +79,22 @@ const resetPassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-module.exports = { login, refresh, logout, register, registerPublic, me, forgotPassword, resetPassword };
+const crearDestinatario = async (req, res, next) => {
+  try {
+    const user = await authService.crearDestinatario(
+      req.body,
+      req.user.id,
+      req.user.empresa_id
+    );
+
+    res.status(201).json({
+      success: true,
+      data: user,
+      message: 'Destinatario creado correctamente.',
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { login, refresh, logout, register, registerPublic, me, forgotPassword, resetPassword, crearDestinatario };

@@ -1,6 +1,3 @@
--- MIGRACIÓN 008 — Sistema de gestión de informes y documentos
-
---  CATÁLOGOS GLOBALES
 CREATE TABLE ente_rector (
   id         INT AUTO_INCREMENT PRIMARY KEY,
   nombre     VARCHAR(160) NOT NULL UNIQUE,

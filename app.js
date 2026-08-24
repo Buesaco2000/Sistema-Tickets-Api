@@ -4,10 +4,7 @@ const cookieParser = require("cookie-parser");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const rateLimit = require("express-rate-limit");
-const {
-  errorHandler,
-  notFoundHandler,
-} = require("./src/Middlewares/error.middleware.js");
+const { errorHandler, notFoundHandler } = require("./src/Middlewares/error.middleware.js");
 const logger       = require("./src/Utils/logger");
 const auditLogger  = require("./src/Middlewares/auditLogger.middleware");
 
@@ -150,7 +147,8 @@ v1.use("/dispensaciones",             require("./src/Modules/dispensaciones/disp
 
 // RUTAS DE INFORMES
 v1.use("/informes", require("./src/Modules/informes/informes.routes.js"));
-v1.use("obligaciones", require("./src/Modules/informes/obligaciones/obligaciones.routes.js"))
+v1.use("/obligaciones", require("./src/Modules/informes/obligaciones/obligaciones.routes.js"));
+
 
 // CATÁLOGOS DE ITEMS (medicamentos, laboratorio, médico-quirúrgico, aseo y papelería)
 const crearCatalogoItemsRouter = require("./src/Modules/catalogoItems/catalogoItems.routes.js");

@@ -24,14 +24,12 @@ const COOKIE_OPTS_REFRESH = {
 };
 
 const _generateTokens = (user) => {
-  // Incluimos cargo, nombres y apellidos en el token para que las rutas
-  // puedan tomar decisiones de acceso basadas en el cargo (ej: dispensaciones)
-  // sin hacer una consulta extra a la BD en cada request.
   const payload = {
     id:         user.id,
     empresa_id: user.empresa_id,
     rol_id:     user.rol_id,
     email:      user.email,
+    cargo_id:   user.cargo_id  || null,
     cargo:      user.cargo    || null,
     nombres:    user.nombres  || null,
     apellidos:  user.apellidos || null,
@@ -64,7 +62,6 @@ const login = async (email, password, empresaId) => {
 
   const user = rows[0];
 
-  // Mensaje vago intencional: evita user enumeration
   if (!user || user.deleted_at || !user.activo) {
     throw new AppError('Credenciales inválidas.', 401);
   }
@@ -118,7 +115,7 @@ const refresh = async (refreshToken) => {
 
   const [rows] = await pool.query(
     `SELECT rt.token_hash, u.id, u.empresa_id, u.rol_id, u.email, u.activo, u.deleted_at,
-            c.nombre AS cargo, u.nombres, u.apellidos
+            u.cargo_id, c.nombre AS cargo, u.nombres, u.apellidos
      FROM refresh_tokens rt
      JOIN users u ON u.id = rt.user_id
      LEFT JOIN cargos c ON c.id = u.cargo_id
@@ -196,6 +193,81 @@ const registerPublic = async (data) => {
   return rows[0];
 };
 
+const crearDestinatario = async (data, createdBy, creatorEmpresaId) => {
+  const {
+    nombres,
+    apellidos,
+    municipio_id,
+    sede_id,
+  } = data;
+
+  if (!nombres?.trim() || !apellidos?.trim())
+    throw new AppError('Nombres y apellidos son obligatorios.', 400);
+
+  if (!municipio_id)
+    throw new AppError('El municipio es obligatorio.', 400);
+
+  // Genera un email único interno que no requiere ser real
+  const slug = `${nombres.trim().toLowerCase().replace(/\s+/g, '.')}.${apellidos.trim().toLowerCase().replace(/\s+/g, '.')}`;
+  const sufijo = crypto.randomBytes(4).toString('hex');
+  const emailGenerado = `${slug}.${sufijo}@ext.suroriente.local`;
+
+  const passwordInicial = crypto.randomBytes(32).toString('hex');
+  const hashed = await bcrypt.hash(passwordInicial, 12);
+
+  const [result] = await pool.query(
+    `INSERT INTO users
+      (
+        nombres,
+        apellidos,
+        email,
+        password,
+        empresa_id,
+        rol_id,
+        cargo_id,
+        municipio_id,
+        sede_id,
+        created_by
+      )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      nombres.trim().toUpperCase(),
+      apellidos.trim().toUpperCase(),
+      emailGenerado,
+      hashed,
+      creatorEmpresaId,
+      ROLES.SALUD,
+      null,
+      municipio_id,
+      sede_id || null,
+      createdBy,
+    ]
+  );
+
+  const [[user]] = await pool.query(
+    `SELECT
+       u.id,
+       u.nombres,
+       u.apellidos,
+       u.email,
+       u.empresa_id,
+       u.rol_id,
+       u.cargo_id,
+       u.municipio_id,
+       u.telefono,
+       c.nombre AS cargo,
+       m.nombre AS municipio
+     FROM users u
+     LEFT JOIN cargos c ON c.id = u.cargo_id
+     LEFT JOIN municipios m ON m.id = u.municipio_id
+     WHERE u.id = ?
+     LIMIT 1`,
+    [result.insertId]
+  );
+
+  return user;
+};
+
 // SEC-03: acepta empresa_id opcional para aislar la búsqueda por tenant
 const forgotPassword = async (email, empresaId = null) => {
   const conds  = ['u.email = ?', 'u.deleted_at IS NULL', 'u.activo = 1'];
@@ -251,4 +323,4 @@ const resetPassword = async (token, newPassword) => {
   await pool.query('DELETE FROM password_reset_tokens WHERE user_id = ?', [rows[0].user_id]);
 };
 
-module.exports = { login, refresh, logout, register, registerPublic, forgotPassword, resetPassword };
+module.exports = { login, refresh, logout, register, registerPublic, crearDestinatario, forgotPassword, resetPassword };

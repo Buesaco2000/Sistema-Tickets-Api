@@ -106,6 +106,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
       fechaVencimiento,
       m.registro_sanitario || null,
       m.estado_registro || null,
+      m.estado_registro === 'VENCIDO' ? (m.autorizacion_uso ?? null) : null,
       m.cum || null,
       m.atc || null,
       m.laboratorio || null,
@@ -135,7 +136,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
         `UPDATE items_recepcion_inventario SET
           catalogo_id=?, tipo_recepcion=?, codigo_interno=?, nombre=?, presentacion_comercial=?,
           concentracion=?, ium=?, unidad_medida=?, fecha_vencimiento=?, registro_sanitario=?,
-          estado_registro=?, cum=?, atc=?, laboratorio=?, clasificacion_riesgo=?, vida_util=?,
+          estado_registro=?, autorizacion_uso=?, cum=?, atc=?, laboratorio=?, clasificacion_riesgo=?, vida_util=?,
           serie=?, cant_solicitada=?, cant_recepcionada=?, cant_faltante=?, lote=?, cadena_frio=?,
           temperatura=?, snna=?, ta=?, cod=?, acr=?, estado_empaque=?, humedo=?, colapsado=?,
           manchado=?, etiquetas=?, tipo_etiquetas=?
@@ -147,7 +148,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
         `INSERT INTO items_recepcion_inventario
           (recepcion_id, catalogo_id, tipo_recepcion, codigo_interno, nombre, presentacion_comercial,
             concentracion, ium, unidad_medida,
-            fecha_vencimiento, registro_sanitario, estado_registro,
+            fecha_vencimiento, registro_sanitario, estado_registro, autorizacion_uso,
             cum, atc, laboratorio,
             clasificacion_riesgo, vida_util, serie,
             cant_solicitada, cant_recepcionada, cant_faltante, lote,
@@ -659,7 +660,7 @@ const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
             i.codigo_interno, i.nombre, i.presentacion_comercial,
             i.concentracion, i.unidad_medida, i.ium,
             i.fecha_vencimiento, i.lote,
-            i.registro_sanitario, i.estado_registro,
+            i.registro_sanitario, i.estado_registro, i.autorizacion_uso,
             i.cum, i.atc, i.laboratorio,
             i.clasificacion_riesgo, i.vida_util, i.serie,
             i.cant_solicitada, i.cant_recepcionada,

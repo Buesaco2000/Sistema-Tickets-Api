@@ -20,6 +20,7 @@ const authenticate = (req, res, next) => {
       empresa_id: decoded.empresa_id,
       rol_id:     decoded.rol_id,
       email:      decoded.email,
+      cargo_id: decoded.cargo_id    || null,
       cargo:      decoded.cargo     || null,
       nombres:    decoded.nombres   || null,
       apellidos:  decoded.apellidos || null,

@@ -16,9 +16,12 @@ const findAll = async (empresaId) => {
             p.codigo AS periodicidad_codigo,
             p.nombre AS periodicidad,
 
-            CONCAT(u.nombre, ' ', u.apellido) AS responsable,
+            co.id   AS cargo_id,
+            co.nombre AS cargo_nombre,
 
-            CONCAT(s.nombre, ' ', s.apellido) AS suplente
+            CONCAT(u.nombres, ' ', u.apellidos) AS responsable,
+
+            CONCAT(s.nombres, ' ', s.apellidos) AS suplente
 
         FROM obligacion o
 
@@ -30,6 +33,9 @@ const findAll = async (empresaId) => {
 
         INNER JOIN periodicidad p
             ON p.id = o.periodicidad_id
+
+        LEFT JOIN cargos co
+            ON co.id = o.cargo_id
 
         LEFT JOIN users u
             ON u.id = o.responsable_id
@@ -56,11 +62,9 @@ const getCatalogos = async (empresaId) => {
             nombre,
             sigla
         FROM ente_rector
-        WHERE empresa_id = ?
-          AND deleted_at IS NULL
+        WHERE activo = TRUE
         ORDER BY nombre ASC
         `,
-        [empresaId]
     );
 
     const [receptores] = await pool.query(
@@ -70,11 +74,9 @@ const getCatalogos = async (empresaId) => {
             nombre,
             url_portal
         FROM receptor
-        WHERE empresa_id = ?
-          AND deleted_at IS NULL
+        WHERE activo = TRUE
         ORDER BY nombre ASC
         `,
-        [empresaId]
     );
 
     const [periodicidades] = await pool.query(
@@ -105,11 +107,16 @@ const getCatalogos = async (empresaId) => {
         [empresaId]
     );
 
+    const [cargos] = await pool.query(
+        `SELECT id, nombre FROM cargos ORDER BY nombre ASC`
+    );
+
     return {
         entesRectores,
         receptores,
         periodicidades,
-        user: users
+        usuarios: users,
+        cargos,
     };
 };
 
@@ -147,6 +154,7 @@ const create = async (empresaId, data, userId) => {
     dias_anticipacion = 30,
     area_elabora,
     area_presenta,
+    cargo_id,
     responsable_id,
     suplente_id,
     activo = true,
@@ -168,12 +176,13 @@ const create = async (empresaId, data, userId) => {
             dias_anticipacion,
             area_elabora,
             area_presenta,
+            cargo_id,
             responsable_id,
             suplente_id,
             activo,
             created_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       empresaId,
@@ -189,6 +198,7 @@ const create = async (empresaId, data, userId) => {
       dias_anticipacion,
       area_elabora || null,
       area_presenta || null,
+      cargo_id || null,
       responsable_id || null,
       suplente_id || null,
       activo,
@@ -215,6 +225,7 @@ const update = async (empresaId, id, data, userId) => {
     dias_anticipacion,
     area_elabora,
     area_presenta,
+    cargo_id,
     responsable_id,
     suplente_id,
     activo,
@@ -236,6 +247,7 @@ const update = async (empresaId, id, data, userId) => {
             dias_anticipacion = ?,
             area_elabora = ?,
             area_presenta = ?,
+            cargo_id = ?,
             responsable_id = ?,
             suplente_id = ?,
             activo = ?,
@@ -257,6 +269,7 @@ const update = async (empresaId, id, data, userId) => {
       dias_anticipacion,
       area_elabora || null,
       area_presenta || null,
+      cargo_id || null,
       responsable_id || null,
       suplente_id || null,
       activo,
@@ -271,22 +284,140 @@ const update = async (empresaId, id, data, userId) => {
 
 const remove = async (empresaId, id, userId) => {
   const [result] = await pool.query(
-    `
-        UPDATE obligacion
-        SET
-            deleted_at = NOW(),
-            updated_by = ?,
-            activo = FALSE
-        WHERE id = ?
-          AND empresa_id = ?
-          AND deleted_at IS NULL
-    `,
+    `UPDATE obligacion
+     SET deleted_at = NOW(), updated_by = ?
+     WHERE id = ? AND empresa_id = ? AND deleted_at IS NULL`,
     [userId, id, empresaId],
   );
-
-  if (!result.affectedRows) {
-    throw new AppError("Obligación no encontrada", 404);
-  }
+  if (!result.affectedRows) throw new AppError("Obligación no encontrada", 404);
 };
 
-module.exports = { findAll, getCatalogos, findById, create, update, remove };
+const toggleActivo = async (empresaId, id, userId) => {
+  const [result] = await pool.query(
+    `UPDATE obligacion
+     SET activo = NOT activo, updated_by = ?
+     WHERE id = ? AND empresa_id = ? AND deleted_at IS NULL`,
+    [userId, id, empresaId],
+  );
+  if (!result.affectedRows) throw new AppError("Obligación no encontrada", 404);
+  return findById(empresaId, id);
+};
+
+const generarEjecuciones = async (empresaId, obligacionId, anio, userId) => {
+    const [rows] = await pool.query(
+        `SELECT o.dias_plazo,
+                p.meses_corte
+         FROM obligacion o
+         JOIN periodicidad p ON p.id = o.periodicidad_id
+         WHERE o.id = ? AND o.empresa_id = ? AND o.deleted_at IS NULL`,
+        [obligacionId, empresaId]
+    );
+    if (!rows.length) throw new AppError("Obligación no encontrada", 404);
+
+    const { dias_plazo, meses_corte } = rows[0];
+
+    const [estados] = await pool.query(
+        `SELECT id FROM estados
+         WHERE nombre = 'PENDIENTE' AND scope = 'INFORME'
+         LIMIT 1`
+    );
+    if (!estados.length) throw new AppError("Estado PENDIENTE no configurado", 500);
+    const estadoId = estados[0].id;
+
+    const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN',
+                   'JUL','AGO','SEP','OCT','NOV','DIC'];
+
+    const meses = Array.isArray(meses_corte) ? meses_corte : JSON.parse(meses_corte);
+    let creadas = 0;
+    let omitidas = 0;
+
+    for (const mes of meses) {
+        const etiqueta = `${MESES[mes - 1]} ${anio}`;
+
+        const fechaCorte = new Date(anio, mes, 0);
+        const fechaCorteStr = fechaCorte.toISOString().split('T')[0];
+
+        const fechaLimite = new Date(fechaCorte);
+        fechaLimite.setDate(fechaLimite.getDate() + dias_plazo);
+        const fechaLimiteStr = fechaLimite.toISOString().split('T')[0];
+
+        try {
+            await pool.query(
+                `INSERT INTO ejecucion_informe
+                 (empresa_id, obligacion_id, estado_id,
+                  etiqueta_corte, fecha_corte, fecha_limite, fecha_limite_orig,
+                  created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [empresaId, obligacionId, estadoId,
+                 etiqueta, fechaCorteStr, fechaLimiteStr, fechaLimiteStr,
+                 userId]
+            );
+            creadas++;
+        } catch (err) {
+            if (err.code === 'ER_DUP_ENTRY') {
+                omitidas++;
+            } else {
+                throw err; 
+            }
+        }
+    }
+
+    return { creadas, omitidas, total: meses.length };
+};
+
+// Historial de ejecuciones + evidencias de una obligación
+const getEjecuciones = async (empresaId, obligacionId) => {
+    // Verifica que la obligación pertenezca a la empresa
+    const [[oblig]] = await pool.query(
+        `SELECT id, codigo, nombre FROM obligacion
+         WHERE id = ? AND empresa_id = ? AND deleted_at IS NULL LIMIT 1`,
+        [obligacionId, empresaId]
+    );
+    if (!oblig) throw new AppError("Obligación no encontrada", 404);
+
+    // Trae ejecuciones ordenadas desc (más reciente primero)
+    const [ejecuciones] = await pool.query(
+        `SELECT ei.id, ei.etiqueta_corte, ei.fecha_corte, ei.fecha_limite,
+                ei.fecha_presentado, ei.numero_radicado,
+                e.nombre AS estado
+         FROM ejecucion_informe ei
+         JOIN estados e ON e.id = ei.estado_id
+         WHERE ei.obligacion_id = ? AND ei.empresa_id = ? AND ei.deleted_at IS NULL
+         ORDER BY ei.fecha_corte DESC`,
+        [obligacionId, empresaId]
+    );
+
+    if (!ejecuciones.length) return { ...oblig, ejecuciones: [] };
+
+    // Evidencias de todas las ejecuciones en una sola query
+    const ids = ejecuciones.map(e => e.id);
+    const [evidencias] = await pool.query(
+        `SELECT ev.id, ev.ejecucion_id, ev.nombre_original, ev.ruta_relativa,
+                ev.mime, ev.tamano_bytes, ev.created_at,
+                te.nombre AS tipo_evidencia,
+                CONCAT(u.nombres, ' ', u.apellidos) AS subido_por
+         FROM evidencia_informe ev
+         JOIN tipo_evidencia te ON te.id = ev.tipo_evidencia_id
+         LEFT JOIN users u ON u.id = ev.subido_por
+         WHERE ev.ejecucion_id IN (?) AND ev.deleted_at IS NULL
+         ORDER BY ev.created_at DESC`,
+        [ids]
+    );
+
+    // Agrupa evidencias por ejecucion_id
+    const evMap = {};
+    for (const ev of evidencias) {
+        if (!evMap[ev.ejecucion_id]) evMap[ev.ejecucion_id] = [];
+        evMap[ev.ejecucion_id].push(ev);
+    }
+
+    return {
+        ...oblig,
+        ejecuciones: ejecuciones.map(ej => ({
+            ...ej,
+            evidencias: evMap[ej.id] ?? [],
+        })),
+    };
+};
+
+module.exports = { findAll, getCatalogos, findById, create, update, remove, toggleActivo, generarEjecuciones, getEjecuciones };

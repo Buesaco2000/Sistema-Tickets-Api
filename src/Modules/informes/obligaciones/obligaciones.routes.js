@@ -5,15 +5,16 @@ const ctrl = require("./obligaciones.controller");
 const router = Router();
 
 router.get("/", authenticate, ctrl.getAll);
-
 router.get("/catalogos", authenticate, ctrl.getCatalogos);
 
-router.get("/:id", authenticate, ctrl.getOne);
-
 router.post("/", authenticate, ctrl.create);
+router.get("/:id/ejecuciones",           authenticate, ctrl.getEjecuciones);
+router.post("/:id/generar-ejecuciones",  authenticate, ctrl.generarEjecuciones);
 
+router.patch("/:id/activo", authenticate, ctrl.toggleActivo);
+router.delete("/:id", authenticate, ctrl.remove);
 router.put("/:id", authenticate, ctrl.update);
 
-router.delete("/:id", authenticate, ctrl.remove);
+router.get("/:id", authenticate, ctrl.getOne);
 
 module.exports = router;
