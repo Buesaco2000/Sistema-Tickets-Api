@@ -5,7 +5,9 @@ const mysql = require("mysql2/promise");
 const EMPRESA_ID = 1;
 
 const OVERRIDES = {
-  "Almacén": "ALMACEN",  
+  "Almacén":                               "ALMACEN",
+  "Contabilidad y Cartera":                "Contabilidad",
+  "Subgerencia\nAdministrativa Y Financiera": "Subgerencia Administrativa Y Financiera",
 };
 
 async function main() {
