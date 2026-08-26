@@ -18,12 +18,11 @@ app.use(helmet());
 
 const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
   .split(",")
-  .map((s) => s.trim().replace(/\/$/, "")); // quita trailing slash
+  .map((s) => s.trim().replace(/\/$/, ""));
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Sin origin: peticiones server-to-server, curl, Postman — permitir
       if (!origin) return callback(null, true);
 
       const normalized = origin.replace(/\/$/, "");
@@ -144,6 +143,7 @@ v1.use("/reportes",                   require("./src/Modules/reportes/reportes.r
 v1.use("/recepciones/medicamentos",   require("./src/Modules/recepcion/recepcion.routes.js"));
 v1.use("/traslados",                  require("./src/Modules/traslados/traslados.routes.js"));
 v1.use("/dispensaciones",             require("./src/Modules/dispensaciones/dispensaciones.routes.js"));
+v1.use("/stock-minimo",               require("./src/Modules/stockMinimo/stockMinimo.routes.js"));
 
 // RUTAS DE INFORMES
 v1.use("/informes", require("./src/Modules/informes/informes.routes.js"));

@@ -88,7 +88,7 @@ const confirmar = async (trasladoId, empresaId, userId, responsableDestino) => {
           cum, atc, laboratorio, cant_recepcionada, cant_solicitada,
           cadena_frio, temperatura, snna, cod, acr,
           estado_empaque)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         recepcionId,
         traslado.medicamento_nombre,
