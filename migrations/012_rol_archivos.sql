@@ -1,0 +1,2 @@
+INSERT INTO roles (id, nombre) VALUES (4, 'ARCHIVOS')
+ON DUPLICATE KEY UPDATE nombre = 'ARCHIVOS';

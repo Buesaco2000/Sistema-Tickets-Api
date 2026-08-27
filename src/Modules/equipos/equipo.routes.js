@@ -95,6 +95,7 @@ const createSchema = z.object({
 
 router.use(authenticate);
 
+router.get('/resumen', ctrl.getResumen);
 router.get('/',    ctrl.getAll);
 router.get('/:id', validate(idParam), ctrl.getOne);
 router.post('/',   authorize(ROLES.ADMIN, ROLES.INGENIERO), validate(createSchema), ctrl.create);

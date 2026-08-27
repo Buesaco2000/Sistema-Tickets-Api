@@ -25,14 +25,15 @@ const COOKIE_OPTS_REFRESH = {
 
 const _generateTokens = (user) => {
   const payload = {
-    id:         user.id,
-    empresa_id: user.empresa_id,
-    rol_id:     user.rol_id,
-    email:      user.email,
-    cargo_id:   user.cargo_id  || null,
-    cargo:      user.cargo    || null,
-    nombres:    user.nombres  || null,
-    apellidos:  user.apellidos || null,
+    id:           user.id,
+    empresa_id:   user.empresa_id,
+    rol_id:       user.rol_id,
+    email:        user.email,
+    cargo_id:     user.cargo_id    || null,
+    cargo:        user.cargo       || null,
+    nombres:      user.nombres     || null,
+    apellidos:    user.apellidos   || null,
+    municipio_id: user.municipio_id || null,  // necesario para filtros por municipio
   };
   const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
   const refreshToken = jwt.sign(
@@ -167,9 +168,9 @@ const register = async (data, createdBy, creatorEmpresaId) => {
   return user[0];
 };
 
-// Registro público — cualquier persona puede crear su cuenta con rol SALUD
+// Registro público — cualquier persona puede crear su cuenta
 const registerPublic = async (data) => {
-  const { nombres, apellidos, email, password, empresa_id, cargo_id, municipio_id, sede_id, telefono } = data;
+  const { nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, sede_id, telefono } = data;
 
   const [existing] = await pool.query(
     'SELECT id FROM users WHERE email = ? AND empresa_id = ?',
@@ -182,7 +183,8 @@ const registerPublic = async (data) => {
   const [result] = await pool.query(
     `INSERT INTO users (nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, sede_id, telefono)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [nombres, apellidos, email.toLowerCase().trim(), hashed, empresa_id, ROLES.SALUD,
+    [nombres, apellidos, email.toLowerCase().trim(), hashed, empresa_id,
+     rol_id || ROLES.SALUD,
      cargo_id || null, municipio_id || null, sede_id || null, telefono || null]
   );
 

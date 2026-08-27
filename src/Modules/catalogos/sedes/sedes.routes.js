@@ -19,6 +19,37 @@ const idParam = z.object({
   params: z.object({ id: z.string().regex(/^\d+$/).transform(Number) }),
 });
 
+// Endpoint público — para pantalla de registro (sin token)
+// Requiere empresa_id por query param; municipio_id es opcional
+router.get('/publicas', async (req, res, next) => {
+  try {
+    const empresaId  = parseInt(req.query.empresa_id,  10);
+    const municipioId = parseInt(req.query.municipio_id, 10);
+
+    if (!empresaId || isNaN(empresaId)) {
+      return next(new AppError('empresa_id es requerido.', 400));
+    }
+
+    const conds  = ['s.empresa_id = ?'];
+    const params = [empresaId];
+
+    if (municipioId && !isNaN(municipioId)) {
+      conds.push('s.municipio_id = ?');
+      params.push(municipioId);
+    }
+
+    const [rows] = await pool.query(
+      `SELECT s.id, s.nombre, s.municipio_id, m.nombre AS municipio
+       FROM sedes s
+       JOIN municipios m ON m.id = s.municipio_id
+       WHERE ${conds.join(' AND ')}
+       ORDER BY s.nombre`,
+      params
+    );
+    return success(res, rows);
+  } catch (e) { next(e); }
+});
+
 router.use(authenticate);
 
 // Devuelve solo las sedes de la empresa del usuario autenticado

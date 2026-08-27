@@ -8,6 +8,52 @@ router.use(authenticate);
 
 const SALUD_ADMIN_ING = [ROLES.ADMIN, ROLES.SALUD, ROLES.INGENIERO];
 
+// ── RESUMEN DASHBOARD INVENTARIO ─────────────────────────────────────────────
+router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const pool = require('../../Config/database');
+    const eid  = req.user.empresa_id;
+    const [[totales], [porCategoria], [recientes]] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*)                     AS total_recepciones,
+          SUM(estado = 'COMPLETADA')   AS completadas,
+          SUM(estado = 'BORRADOR')     AS borradores,
+          0                            AS pendientes,
+          (SELECT COUNT(*)
+           FROM items_recepcion_inventario i
+           JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
+           WHERE r2.empresa_id = ? AND r2.deleted_at IS NULL
+             AND i.fecha_vencimiento IS NOT NULL
+             AND i.fecha_vencimiento < CURDATE()
+          )                            AS items_vencidos
+        FROM recepciones_inventario
+        WHERE empresa_id = ? AND deleted_at IS NULL`, [eid, eid, eid]),
+
+      pool.query(`
+        SELECT i.tipo_recepcion AS categoria, COUNT(*) AS total
+        FROM items_recepcion_inventario i
+        JOIN recepciones_inventario r ON r.id = i.recepcion_id
+        WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
+        GROUP BY i.tipo_recepcion`, [eid]),
+
+      pool.query(`
+        SELECT r.id, r.municipio_id, m.nombre AS municipio, r.estado,
+               r.created_at, CONCAT(u.nombres,' ',u.apellidos) AS creado_por,
+               COUNT(i.id) AS total_items
+        FROM recepciones_inventario r
+        LEFT JOIN municipios m ON m.id = r.municipio_id
+        LEFT JOIN users u ON u.id = r.created_by
+        LEFT JOIN items_recepcion_inventario i ON i.recepcion_id = r.id
+        WHERE r.empresa_id = ?  AND r.deleted_at IS NULL
+        GROUP BY r.id, m.nombre, r.estado, r.created_at, u.nombres, u.apellidos, r.municipio_id
+        ORDER BY r.created_at DESC LIMIT 6`, [eid]),
+    ]);
+
+    res.json({ success: true, data: { ...totales[0], porCategoria, recientes } });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.findAll(req.user.empresa_id);

@@ -2,26 +2,39 @@ const informesService = require('./informes.service');
 const { success } = require('../../Utils/response');
 const AppError = require('../../Utils/AppError');
 
+/** Calcula los filtros de visibilidad según el rol y cargo del usuario:
+ *  - ADMIN              → ve todo (cargoId=null, municipioId=null)
+ *  - Coordinador Adm.   → ve todos los informes de SU municipio (cargoId=null, municipioId=X)
+ *  - Resto              → solo ve los informes de su propio cargo */
+const _filtrosVisibilidad = (user) => {
+    const esAdmin    = user.rol_id === 1;
+    const esCoordAdm = (user.cargo || '').toLowerCase().includes('coordinador administrativo');
+
+    if (esAdmin)    return { cargoId: null, municipioId: null };
+    if (esCoordAdm) return { cargoId: null, municipioId: user.municipio_id || null };
+    return { cargoId: user.cargo_id || null, municipioId: null };
+};
+
 const getResumen = async (req, res, next) => {
     try {
-        const anio     = req.query.anio ? Number(req.query.anio) : new Date().getFullYear();
-        const esAdmin  = req.user.rol_id === 1;
-        const cargoId  = esAdmin ? null : (req.user.cargo_id || null);
-        const resumen  = await informesService.getResumen(req.user.empresa_id, anio, cargoId);
+        const anio  = req.query.anio ? Number(req.query.anio) : new Date().getFullYear();
+        const { cargoId, municipioId } = _filtrosVisibilidad(req.user);
+        const resumen = await informesService.getResumen(req.user.empresa_id, anio, cargoId, municipioId);
         return success(res, resumen);
     } catch (err) { next(err); }
 }
 
 const getAll = async (req, res, next) => {
     try {
-        const esAdmin = req.user.rol_id === 1;
+        const { cargoId, municipioId } = _filtrosVisibilidad(req.user);
         const filters = {
-            anio:      req.query.anio ? Number(req.query.anio) : new Date().getFullYear(),
-            estado:    req.query.estado || null,
-            texto:     req.query.texto || null,
-            soloMios:  req.query.soloMios === 'true', 
-            userId:    req.user.id,
-            cargoId:  esAdmin ? null : (req.user.cargo_id || null),
+            anio:        req.query.anio ? Number(req.query.anio) : new Date().getFullYear(),
+            estado:      req.query.estado || null,
+            texto:       req.query.texto  || null,
+            soloMios:    req.query.soloMios === 'true',
+            userId:      req.user.id,
+            cargoId,
+            municipioId,
         };
         const rows = await informesService.findAll(req.user.empresa_id, filters);
         return success(res, rows);
@@ -77,9 +90,8 @@ const remove = async (req, res, next) => {
 
 const getAnios = async (req, res, next) => {
     try {
-        const esAdmin = req.user.rol_id === 1;
-        const cargoId = esAdmin ? null : (req.user.cargo_id || null);
-        const anios = await informesService.getAniosDisponibles(req.user.empresa_id, cargoId);
+        const { cargoId, municipioId } = _filtrosVisibilidad(req.user);
+        const anios = await informesService.getAniosDisponibles(req.user.empresa_id, cargoId, municipioId);
         return success(res, anios);
     } catch (err) { next(err); }
 };

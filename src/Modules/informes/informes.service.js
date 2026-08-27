@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 
-const getResumen = async (empresaId, anio, cargoId = null) => {
+const getResumen = async (empresaId, anio, cargoId = null, municipioId = null) => {
     let query = `
         SELECT
             COUNT(CASE WHEN e.nombre = 'VENCIDO' THEN 1 END) AS vencidos,
@@ -16,6 +16,7 @@ const getResumen = async (empresaId, anio, cargoId = null) => {
         FROM ejecucion_informe ei
         JOIN estados e    ON ei.estado_id  = e.id
         JOIN obligacion o ON o.id          = ei.obligacion_id
+        LEFT JOIN users u ON u.id          = o.responsable_id
         WHERE ei.empresa_id = ? AND ei.deleted_at IS NULL AND YEAR(ei.fecha_corte) = ?
     `;
     const params = [empresaId, anio];
@@ -23,6 +24,11 @@ const getResumen = async (empresaId, anio, cargoId = null) => {
     if (cargoId) {
         query  += " AND o.cargo_id = ?";
         params.push(cargoId);
+    }
+    // Coordinador Administrativo: solo ve los informes de su municipio
+    if (municipioId) {
+        query += " AND u.municipio_id = ?";
+        params.push(municipioId);
     }
 
     const [rows] = await pool.query(query, params);
@@ -70,6 +76,12 @@ const findAll = async (empresaId, filtros) => {
     if (filtros.cargoId) {
         conds.push("o.cargo_id = ?");
         params.push(filtros.cargoId);
+    }
+
+    // Coordinador Administrativo: filtra por municipio del responsable
+    if (filtros.municipioId) {
+        conds.push("u.municipio_id = ?");
+        params.push(filtros.municipioId);
     }
 
     if (conds.length) query += " AND " + conds.join(" AND ");
@@ -262,15 +274,17 @@ const eliminarEvidencia = async (empresaId, id, userId) => {
         throw new AppError("Evidencia no encontrada o ya eliminada", 404);
 }
 
-const getAniosDisponibles = async (empresaId, cargoId = null) => {
+const getAniosDisponibles = async (empresaId, cargoId = null, municipioId = null) => {
     let query = `
         SELECT DISTINCT YEAR(ei.fecha_corte) AS anio
         FROM ejecucion_informe ei
-        JOIN obligacion o ON o.id = ei.obligacion_id
+        JOIN obligacion o  ON o.id  = ei.obligacion_id
+        LEFT JOIN users u  ON u.id  = o.responsable_id
         WHERE ei.empresa_id = ? AND ei.deleted_at IS NULL
     `;
     const params = [empresaId];
-    if (cargoId) { query += " AND o.cargo_id = ?"; params.push(cargoId); }
+    if (cargoId)    { query += " AND o.cargo_id = ?";    params.push(cargoId); }
+    if (municipioId){ query += " AND u.municipio_id = ?"; params.push(municipioId); }
     query += " ORDER BY anio DESC";
     const [rows] = await pool.query(query, params);
     return rows.map(r => r.anio);
