@@ -8,11 +8,16 @@ router.use(authenticate);
 
 const SALUD_ADMIN_ING = [ROLES.ADMIN, ROLES.SALUD, ROLES.INGENIERO];
 
-// ── RESUMEN DASHBOARD INVENTARIO ─────────────────────────────────────────────
 router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
-    const pool = require('../../Config/database');
-    const eid  = req.user.empresa_id;
+    const pool       = require('../../Config/database');
+    const eid        = req.user.empresa_id;
+    const municipioId = req.query.municipio_id ? parseInt(req.query.municipio_id, 10) : null;
+
+    const munCond  = municipioId ? ' AND r.municipio_id = ?' : '';
+    const munCond2 = municipioId ? ' AND municipio_id = ?'   : '';
+    const munParam = municipioId ? [municipioId] : [];
+
     const [[totales], [porCategoria], [recientes]] = await Promise.all([
       pool.query(`
         SELECT
@@ -24,18 +29,20 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
            FROM items_recepcion_inventario i
            JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
            WHERE r2.empresa_id = ? AND r2.deleted_at IS NULL
+             ${municipioId ? 'AND r2.municipio_id = ?' : ''}
              AND i.fecha_vencimiento IS NOT NULL
              AND i.fecha_vencimiento < CURDATE()
           )                            AS items_vencidos
         FROM recepciones_inventario
-        WHERE empresa_id = ? AND deleted_at IS NULL`, [eid, eid, eid]),
+        WHERE empresa_id = ?${munCond2} AND deleted_at IS NULL`,
+        [eid, ...(municipioId ? [municipioId] : []), eid, ...munParam]),
 
       pool.query(`
         SELECT i.tipo_recepcion AS categoria, COUNT(*) AS total
         FROM items_recepcion_inventario i
         JOIN recepciones_inventario r ON r.id = i.recepcion_id
-        WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
-        GROUP BY i.tipo_recepcion`, [eid]),
+        WHERE r.empresa_id = ?${munCond} AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
+        GROUP BY i.tipo_recepcion`, [eid, ...munParam]),
 
       pool.query(`
         SELECT r.id, r.municipio_id, m.nombre AS municipio, r.estado,
@@ -45,9 +52,9 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
         LEFT JOIN municipios m ON m.id = r.municipio_id
         LEFT JOIN users u ON u.id = r.created_by
         LEFT JOIN items_recepcion_inventario i ON i.recepcion_id = r.id
-        WHERE r.empresa_id = ?  AND r.deleted_at IS NULL
+        WHERE r.empresa_id = ?${munCond} AND r.deleted_at IS NULL
         GROUP BY r.id, m.nombre, r.estado, r.created_at, u.nombres, u.apellidos, r.municipio_id
-        ORDER BY r.created_at DESC LIMIT 6`, [eid]),
+        ORDER BY r.created_at DESC LIMIT 6`, [eid, ...munParam]),
     ]);
 
     res.json({ success: true, data: { ...totales[0], porCategoria, recientes } });
@@ -75,7 +82,7 @@ router.get('/items/reporte', authorize(...SALUD_ADMIN_ING), async (req, res, nex
   } catch (err) { next(err); }
 });
 
-// ── BORRADOR ─────────────────────────────────────────────────────────────────
+//  BORRADOR 
 router.get('/borrador/mio', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.findBorradorByUser(req.user.id, req.user.empresa_id);
@@ -97,7 +104,7 @@ router.delete('/borrador/:id', authorize(...SALUD_ADMIN_ING), async (req, res, n
   } catch (err) { next(err); }
 });
 
-// ── SALIDAS ──────────────────────────────────────────────────────────────────
+//  SALIDAS 
 router.post('/salidas', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const id = await svc.createSalida(req.body, req.user.id, req.user.empresa_id);
@@ -112,7 +119,7 @@ router.get('/salidas/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, 
   } catch (err) { next(err); }
 });
 
-// ── DISPENSACIONES ───────────────────────────────────────────────────────────
+//  DISPENSACIONES 
 router.get('/dispensaciones/:item_id', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.getDispensacionesByItem(Number(req.params.item_id), req.user.empresa_id);
@@ -127,7 +134,6 @@ router.get('/items/:id/trazabilidad', authorize(...SALUD_ADMIN_ING), async (req,
   } catch (err) { next(err); }
 });
 
-// ── CRUD recepción (/:id al final para no interceptar rutas con prefijo) ────
 router.post('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.create(req.body, req.user.id, req.user.empresa_id);
