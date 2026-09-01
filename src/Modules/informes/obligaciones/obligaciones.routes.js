@@ -1,20 +1,24 @@
 const { Router } = require("express");
 const { authenticate } = require('../../../Middlewares/auth.middleware');
+const { authorize }    = require('../../../Middlewares/rbac.middleware');
+const ROLES            = require('../../../Utils/roles');
 const ctrl = require("./obligaciones.controller");
 
 const router = Router();
 
-router.get("/", authenticate, ctrl.getAll);
-router.get("/catalogos", authenticate, ctrl.getCatalogos);
+const ARCHIVOS_ADMIN = [ROLES.ADMIN, ROLES.ARCHIVOS];
 
-router.post("/", authenticate, ctrl.create);
-router.get("/:id/ejecuciones",           authenticate, ctrl.getEjecuciones);
-router.post("/:id/generar-ejecuciones",  authenticate, ctrl.generarEjecuciones);
+// Lectura — ADMIN y ARCHIVOS
+router.get("/",                          authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getAll);
+router.get("/catalogos",                 authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getCatalogos);
+router.get("/:id",                       authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getOne);
+router.get("/:id/ejecuciones",           authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getEjecuciones);
 
-router.patch("/:id/activo", authenticate, ctrl.toggleActivo);
-router.delete("/:id", authenticate, ctrl.remove);
-router.put("/:id", authenticate, ctrl.update);
-
-router.get("/:id", authenticate, ctrl.getOne);
+// Escritura — ADMIN y ARCHIVOS
+router.post("/",                         authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.create);
+router.put("/:id",                       authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.update);
+router.patch("/:id/activo",              authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.toggleActivo);
+router.delete("/:id",                    authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.remove);
+router.post("/:id/generar-ejecuciones", authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.generarEjecuciones);
 
 module.exports = router;
