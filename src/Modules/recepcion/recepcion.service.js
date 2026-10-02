@@ -41,7 +41,7 @@ const findAll = async (empresaId) => {
   return rows;
 };
 
-// ── BORRADOR: buscar el borrador activo del usuario ───────────────────────────
+//  BORRADOR: buscar el borrador activo del usuario 
 const findBorradorByUser = async (userId, empresaId) => {
   const [[row]] = await pool.query(
     `SELECT r.*,
@@ -70,7 +70,7 @@ const findBorradorByUser = async (userId, empresaId) => {
   return { ...row, medicamentos };
 };
 
-// ── Función interna: sincroniza los ítems de un borrador/recepción ────────────
+//  Función interna: sincroniza los ítems de un borrador/recepción 
 const _syncItems = async (conn, recepcionId, medicamentos) => {
   const items = Array.isArray(medicamentos) ? medicamentos : [];
 
@@ -162,8 +162,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
   }
 };
 
-// ── BORRADOR: guardar o actualizar ────────────────────────────────────────────
-// Si el usuario ya tiene un borrador, lo reemplaza. Si no, crea uno nuevo.
+//  BORRADOR: guardar o actualizar 
 const saveBorrador = async (data, userId, empresaId) => {
   const {
     tipo_recepcion,
@@ -257,7 +256,7 @@ const saveBorrador = async (data, userId, empresaId) => {
   }
 };
 
-// ── BORRADOR: eliminar ────────────────────────────────────────────────────────
+//  BORRADOR: eliminar 
 const deleteBorrador = async (id, userId, empresaId) => {
   const [result] = await pool.query(
     `UPDATE recepciones_inventario SET deleted_at = NOW()
@@ -267,7 +266,7 @@ const deleteBorrador = async (id, userId, empresaId) => {
   if (!result.affectedRows) throw new AppError("Borrador no encontrado.", 404);
 };
 
-// ── Crear recepción COMPLETADA ────────────────────────────────────────────────
+//  Crear recepción COMPLETADA 
 const create = async (data, userId, empresaId) => {
   const {
     tipo_recepcion,
@@ -489,15 +488,8 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
 };
 
 const createSalida = async (data, userId, empresaId) => {
-  const {
-    item_id,
-    cantidad,
-    fecha,
-    motivo,
-    responsable,
-    municipio_destino_id,
-    sede_destino_id,
-  } = data;
+  const { item_id, cantidad, fecha, motivo, responsable,
+    municipio_destino_id, sede_destino_id } = data;
 
   const [[item]] = await pool.query(
     `SELECT i.id, i.nombre,
@@ -525,8 +517,9 @@ const createSalida = async (data, userId, empresaId) => {
     throw new AppError(`Stock insuficiente. Disponible: ${stock}`, 400);
   }
 
-  const esTraslado = motivo === "Traslado";
-  const estadoSalida = esTraslado ? "PENDIENTE" : "ACTIVO";
+  const esPrestamos = motivo === "Prestamo";
+  const esRotacion  = motivo === "Rotacion";
+  const estadoSalida = (esPrestamos || esRotacion) ? "PENDIENTE" : "ACTIVO";
 
   const conn = await pool.getConnection();
   try {
@@ -552,7 +545,7 @@ const createSalida = async (data, userId, empresaId) => {
     );
     const salidaId = result.insertId;
 
-    if (esTraslado) {
+    if (esPrestamos || esRotacion) {
       await conn.query(
         `INSERT INTO traslados_pendientes
            (empresa_id, salida_id, item_id, cantidad, medicamento_nombre,
