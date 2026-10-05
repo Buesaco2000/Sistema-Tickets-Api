@@ -745,6 +745,92 @@ const getTrazabilidad = async (itemId, empresaId) => {
   return { item, salidas, dispensaciones, traslados };
 };
 
+const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) => {
+  const c = (cargo || "").toLowerCase();
+  const esAlmacen = c.includes("almacen") || rolId === ROLES.ADMIN;
+
+  const { tipo_recepcion, fecha_desde, fecha_hasta } = query;
+
+  // ALMACEN/ADMIN ven todo; los demás solo sus propias salidas
+  const userCond1 = !esAlmacen ? " AND sm.created_by = ?" : "";
+  const userCond2 = !esAlmacen ? " AND d.director_id = ?"  : "";
+  const catCond   = tipo_recepcion ? " AND i.tipo_recepcion = ?" : "";
+  const datCond1  = fecha_desde    ? " AND sm.fecha >= ?"        : "";
+  const datCond2  = fecha_hasta    ? " AND sm.fecha <= ?"        : "";
+  const datCond3  = fecha_desde    ? " AND DATE(d.created_at) >= ?" : "";
+  const datCond4  = fecha_hasta    ? " AND DATE(d.created_at) <= ?" : "";
+
+  const baseParams = (extra = []) => [
+    empresaId,
+    ...(!esAlmacen        ? [userId]         : []),
+    ...(tipo_recepcion    ? [tipo_recepcion]  : []),
+    ...extra,
+  ];
+
+  const [directas] = await pool.query(
+    `SELECT 'DIRECTA' AS tipo_salida,
+            sm.id,
+            sm.fecha,
+            sm.cantidad,
+            sm.motivo,
+            sm.responsable,
+            sm.estado,
+            i.nombre,
+            i.codigo_interno,
+            i.lote,
+            i.tipo_recepcion,
+            mu.nombre  AS municipio,
+            md.nombre  AS municipio_destino,
+            sm.created_at
+     FROM salidas_medicamentos sm
+     JOIN items_recepcion_inventario i ON i.id = sm.item_id
+     JOIN recepciones_inventario r     ON r.id = i.recepcion_id
+     LEFT JOIN municipios mu ON mu.id = r.municipio_id
+     LEFT JOIN municipios md ON md.id = sm.municipio_destino_id
+     WHERE r.empresa_id = ? AND sm.estado != 'RECHAZADO'
+       ${userCond1}${catCond}${datCond1}${datCond2}
+     ORDER BY sm.fecha DESC, sm.created_at DESC`,
+    baseParams([
+      ...(fecha_desde ? [fecha_desde] : []),
+      ...(fecha_hasta ? [fecha_hasta] : []),
+    ])
+  );
+
+  const [distribuciones] = await pool.query(
+    `SELECT 'DISTRIBUCION' AS tipo_salida,
+            d.id,
+            DATE(d.created_at) AS fecha,
+            di.cantidad,
+            d.tipo              AS motivo,
+            CONCAT(u.nombres,' ',u.apellidos) AS responsable,
+            d.estado,
+            i.nombre,
+            i.codigo_interno,
+            i.lote,
+            i.tipo_recepcion,
+            mu.nombre  AS municipio,
+            NULL       AS municipio_destino,
+            d.created_at
+     FROM dispensacion_items di
+     JOIN dispensaciones d ON d.id = di.dispensacion_id
+     JOIN items_recepcion_inventario i ON i.id = di.item_id
+     JOIN recepciones_inventario r     ON r.id = i.recepcion_id
+     LEFT JOIN municipios mu ON mu.id = r.municipio_id
+     JOIN users u ON u.id = d.director_id
+     WHERE d.empresa_id = ? AND d.estado != 'RECHAZADO'
+       ${userCond2}${catCond}${datCond3}${datCond4}
+     ORDER BY d.created_at DESC`,
+    baseParams([
+      ...(fecha_desde ? [fecha_desde] : []),
+      ...(fecha_hasta ? [fecha_hasta] : []),
+    ])
+  );
+
+  const todos = [...directas, ...distribuciones];
+  todos.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return todos;
+};
+
 module.exports = {
   findAll,
   findAllItems,
@@ -759,4 +845,5 @@ module.exports = {
   findBorradorByUser,
   saveBorrador,
   deleteBorrador,
+  getSalidasReporte,
 };

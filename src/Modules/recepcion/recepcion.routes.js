@@ -104,7 +104,21 @@ router.delete('/borrador/:id', authorize(...SALUD_ADMIN_ING), async (req, res, n
   } catch (err) { next(err); }
 });
 
-//  SALIDAS 
+// REPORTE DE SALIDAS (directas + distribución)
+router.get('/salidas-reporte', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const data = await svc.getSalidasReporte(
+      req.user.empresa_id,
+      req.user.id,
+      req.user.rol_id,
+      req.user.cargo,
+      req.query
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+});
+
+//  SALIDAS
 router.post('/salidas', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const id = await svc.createSalida(req.body, req.user.id, req.user.empresa_id);
