@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
 
-const getResumen = async (empresaId, anio, cargoId = null, municipioId = null) => {
+const getResumen = async (empresaId, anio, cargoId = null, municipioId = null, userId = null) => {
     let query = `
         SELECT
             COUNT(CASE WHEN e.nombre = 'VENCIDO' THEN 1 END) AS vencidos,
@@ -29,6 +29,11 @@ const getResumen = async (empresaId, anio, cargoId = null, municipioId = null) =
     if (municipioId) {
         query += " AND u.municipio_id = ?";
         params.push(municipioId);
+    }
+    // Usuario normal: solo cuenta sus propios informes
+    if (userId) {
+        query += " AND o.responsable_id = ?";
+        params.push(userId);
     }
 
     const [rows] = await pool.query(query, params);

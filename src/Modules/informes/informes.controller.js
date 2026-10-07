@@ -19,7 +19,10 @@ const getResumen = async (req, res, next) => {
     try {
         const anio  = req.query.anio ? Number(req.query.anio) : new Date().getFullYear();
         const { cargoId, municipioId } = _filtrosVisibilidad(req.user);
-        const resumen = await informesService.getResumen(req.user.empresa_id, anio, cargoId, municipioId);
+        const esAdmin    = req.user.rol_id === 1;
+        const esCoordAdm = (req.user.cargo || '').toLowerCase().includes('coordinador administrativo');
+        const userId = (!esAdmin && !esCoordAdm) ? req.user.id : null;
+        const resumen = await informesService.getResumen(req.user.empresa_id, anio, cargoId, municipioId, userId);
         return success(res, resumen);
     } catch (err) { next(err); }
 }
