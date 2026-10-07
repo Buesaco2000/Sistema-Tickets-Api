@@ -18,10 +18,12 @@ const _filtrosVisibilidad = (user) => {
 const getResumen = async (req, res, next) => {
     try {
         const anio  = req.query.anio ? Number(req.query.anio) : new Date().getFullYear();
-        const { cargoId, municipioId } = _filtrosVisibilidad(req.user);
         const esAdmin    = req.user.rol_id === 1;
         const esCoordAdm = (req.user.cargo || '').toLowerCase().includes('coordinador administrativo');
-        const userId = (!esAdmin && !esCoordAdm) ? req.user.id : null;
+        const soloMios   = !esAdmin && !esCoordAdm;
+        // Cuando filtramos por responsable_id el cargo/municipio no aplican
+        const { cargoId, municipioId } = soloMios ? { cargoId: null, municipioId: null } : _filtrosVisibilidad(req.user);
+        const userId = soloMios ? req.user.id : null;
         const resumen = await informesService.getResumen(req.user.empresa_id, anio, cargoId, municipioId, userId);
         return success(res, resumen);
     } catch (err) { next(err); }
@@ -30,14 +32,16 @@ const getResumen = async (req, res, next) => {
 const getAll = async (req, res, next) => {
     try {
         const { cargoId, municipioId } = _filtrosVisibilidad(req.user);
+        const soloMios = req.query.soloMios === 'true';
         const filters = {
             anio:        req.query.anio ? Number(req.query.anio) : new Date().getFullYear(),
             estado:      req.query.estado || null,
             texto:       req.query.texto  || null,
-            soloMios:    req.query.soloMios === 'true',
+            soloMios,
             userId:      req.user.id,
-            cargoId,
-            municipioId,
+            // Si soloMios=true el responsable_id ya acota los resultados; cargo/municipio sobran
+            cargoId:     soloMios ? null : cargoId,
+            municipioId: soloMios ? null : municipioId,
         };
         const rows = await informesService.findAll(req.user.empresa_id, filters);
         return success(res, rows);
