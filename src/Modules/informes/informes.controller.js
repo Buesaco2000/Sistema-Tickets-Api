@@ -57,10 +57,20 @@ const getOne = async (req, res, next) => {
 
 const cambiarEstado = async (req, res, next) => {
     try{
+        // Acepta estado_nombre (preferido) o estado_id (legado)
+        let estadoId = req.body.estado_id ?? null;
+        if (req.body.estado_nombre) {
+            const [[row]] = await require('../../Config/database').query(
+                "SELECT id FROM estados WHERE nombre = ? AND scope = 'INFORME' LIMIT 1",
+                [req.body.estado_nombre]
+            );
+            if (!row) return next(new (require('../../Utils/AppError'))(`Estado '${req.body.estado_nombre}' no existe`, 400));
+            estadoId = row.id;
+        }
         const informe = await informesService.cambiarEstado(
-            req.user.empresa_id, 
-            Number(req.params.id), 
-            req.body.estado_id, 
+            req.user.empresa_id,
+            Number(req.params.id),
+            estadoId,
             req.user.id,
             req.body.observaciones || null
         );
