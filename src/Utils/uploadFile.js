@@ -11,9 +11,12 @@ const ALLOWED_INFORME_MIMETYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // docx
   "image/jpeg",
   "image/png",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/x-zip",
 ];
 const MAX_SIZE       = 10 * 1024 * 1024;
-const MAX_SIZE_50MB  = 50 * 1024 * 1024;
+const MAX_SIZE_50MB  = 500 * 1024 * 1024;
 
 const imgFilter = (req, file, cb) => {
   if (!ALLOWED_IMG_MIMETYPES.includes(file.mimetype))
@@ -55,7 +58,7 @@ const docOpts = (folder) => ({
 
 const informeFilter = (req, file, cb) => {
   if (!ALLOWED_INFORME_MIMETYPES.includes(file.mimetype))
-    return cb(new Error("Tipo de archivo no permitido. Use PDF, XLSX, DOCX, JPG o PNG."));
+    return cb(new Error("Tipo de archivo no permitido. Use PDF, XLSX, DOCX, JPG, PNG o ZIP."));
   cb(null, true);
 };
 

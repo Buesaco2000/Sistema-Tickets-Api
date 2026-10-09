@@ -14,6 +14,16 @@ const errorHandler = (err, req, res, _next) => {
     stack:   process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 
+  // Multer: archivo demasiado grande
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ success: false, message: 'El archivo supera el tamaño máximo permitido (500 MB).', data: null });
+  }
+
+  // Multer: tipo de archivo no permitido
+  if (err.code === 'LIMIT_UNEXPECTED_FILE' || err.message?.startsWith('Tipo de archivo no permitido') || err.message?.startsWith('Solo se permiten')) {
+    return res.status(415).json({ success: false, message: err.message, data: null });
+  }
+
   // MySQL: entrada duplicada
   if (err.code === 'ER_DUP_ENTRY') {
     return res.status(409).json({ success: false, message: 'El registro ya existe.', data: null });

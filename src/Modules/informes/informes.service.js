@@ -255,7 +255,7 @@ const subirEvidencia = async (empresaId, ejecucionId, tipoEvidenciaId, file, use
 
     try {
         await pool.query(
-            `INSERT INTO evidencia_informe 
+            `INSERT INTO evidencia_informe
                 (empresa_id, ejecucion_id, tipo_evidencia_id, nombre_original,
                 nombre_archivo, ruta_relativa, mime, tamano_bytes, hash_sha256, subido_por)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

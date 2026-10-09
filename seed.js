@@ -1,7 +1,3 @@
-/**
- * Seed: crea datos base + primer usuario ADMIN.
- * Uso: node seed.js
- */
 require("dotenv").config();
 const mysql = require("mysql2/promise");
 const bcrypt = require("bcrypt");
@@ -28,14 +24,14 @@ const EMPRESA = { nombre: "ESE SurOriente Cauca" };
   console.log("✅ Conectado a MySQL");
 
   try {
-    // ── 1. Roles ────────────────────────────────────────────────
+    //  1. Roles 
     await conn.query(`
       INSERT IGNORE INTO roles (id, nombre) VALUES
         (1, 'ADMIN'), (2, 'INGENIERO'), (3, 'SALUD')
     `);
     console.log("✅ Roles ok");
 
-    // ── 2. Estados ──────────────────────────────────────────────
+    //  2. Estados 
     await conn.query(`
       INSERT IGNORE INTO estados (nombre, scope) VALUES
         ('Abierto',    'TICKET'),
@@ -47,8 +43,7 @@ const EMPRESA = { nombre: "ESE SurOriente Cauca" };
     `);
     console.log("✅ Estados ok");
 
-    // ── 3. Tipos de soporte (IDs fijos usados en el frontend) ───
-    //   id=1 → Otros  |  id=2 → R-FAST  |  id=3 → Notas Crédito
+    //  3. Tipos de soporte
     await conn.query(`
       INSERT IGNORE INTO tipos_soporte (id, nombre, requiere_detalle) VALUES
         (1, 'Otros',         0),
@@ -57,7 +52,7 @@ const EMPRESA = { nombre: "ESE SurOriente Cauca" };
     `);
     console.log("✅ Tipos de soporte ok");
 
-    // ── 4. Municipios base ──────────────────────────────────────
+    //  4. Municipios base 
     await conn.query(`
       INSERT IGNORE INTO municipios (nombre) VALUES
         ('LA VEGA'), ('ALMAGUER'), ('SAN SEBASTIAN'),
@@ -65,7 +60,7 @@ const EMPRESA = { nombre: "ESE SurOriente Cauca" };
     `);
     console.log("✅ Municipios ok");
 
-    // ── 5. Empresa ──────────────────────────────────────────────
+    //  5. Empresa ──────────────────────────────────────────────
     const [[emp]] = await conn.query("SELECT id FROM empresa LIMIT 1");
 
     let empresaId;
@@ -81,7 +76,7 @@ const EMPRESA = { nombre: "ESE SurOriente Cauca" };
       console.log(`✅ Empresa creada id=${empresaId}`);
     }
 
-    // ── 6. Usuario ADMIN ────────────────────────────────────────
+    //  6. Usuario ADMIN 
     const [[existing]] = await conn.query(
       "SELECT id FROM users WHERE email = ?",
       [ADMIN.email],

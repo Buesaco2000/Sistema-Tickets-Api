@@ -7,7 +7,6 @@ const EXCEL_PATH = process.argv[2] || "C:/Users/Sebastian/Downloads/Data_Informe
 const SHEET_NAME = "Data";
 const EMPRESA_ID = 1;
 
-// Mapa de periodicidades del Excel → código en la BD
 const PERIOD_MAP = {
   "Año":           "ANUAL",
   "Trimestre":     "TRIMESTRAL",
@@ -19,7 +18,6 @@ const PERIOD_MAP = {
   "Ocasional":     "OCASIONAL",
 };
 
-// Etiquetas de mes en español
 const MESES_ES = ["ENE","FEB","MAR","ABR","MAY","JUN", "JUL","AGO","SEP","OCT","NOV","DIC"];
 
 //  HELPERS 
@@ -33,7 +31,6 @@ const excelDate = (serial) => {
   return `${y}-${m}-${day}`;
 };
 
-// Obtiene o inserta un registro y retorna su id
 const getOrInsert = async (conn, table, whereCol, whereVal, insertSQL, insertParams) => {
   const [rows] = await conn.query(
     `SELECT id FROM ${table} WHERE ${whereCol} = ? LIMIT 1`,
@@ -91,7 +88,7 @@ async function main() {
       console.log(`   [${receptorIdMap[nombre]}] ${nombre}`);
     }
 
-    //  4. Periodicidades extra (Cuatrienio y Ocasional) 
+    //  4. Periodicidades extra
     console.log("\n📅 Verificando periodicidades...");
     const extra = [
       { codigo: "CUATRIENIO", nombre: "Cuatrienio", meses_corte: "[12]", cortes_por_ano: 0 },
@@ -120,7 +117,6 @@ async function main() {
     console.log("\n📋 Procesando obligaciones...");
     const obligMap = {};
 
-    // Arrancar el contador desde el máximo código OBL existente en la BD
     const [maxRow] = await conn.query(
       `SELECT MAX(CAST(SUBSTRING(codigo, 5) AS UNSIGNED)) AS max_seq
        FROM obligacion WHERE empresa_id = ? AND codigo LIKE 'OBL-%'`,
@@ -150,10 +146,6 @@ async function main() {
       const fechaCorte   = excelDate(corteSer);
       const fechaLimite  = excelDate(limiteSer);
 
-      // Días de plazo = diferencia entre corte y límite.
-      // Solo se calcula si la fecha límite es POSTERIOR al corte (diferencia positiva).
-      // Si el límite está antes del corte (ej: obligaciones anuales con vencimiento
-      // en nov pero corte en dic), se usa el default de 30 días para no inflar el plazo.
       let diasPlazo = 30;
       if (fechaCorte && fechaLimite && fechaLimite > fechaCorte) {
         diasPlazo = Math.round(
@@ -178,7 +170,6 @@ async function main() {
       };
     }
 
-    // Insertar obligaciones (o recuperar si ya existen)
     for (const key of Object.keys(obligMap)) {
       const o = obligMap[key];
       const [existing] = await conn.query(
@@ -242,8 +233,7 @@ async function main() {
       const fechaCorte = excelDate(corteSer);
       if (!fechaCorte) continue;
 
-      // Si no hay fecha límite en el Excel, o si es anterior al corte (dato malo),
-      // calcularla desde corte + dias_plazo
+
       let fechaLimite = excelDate(limiteSer);
       if (!fechaLimite || fechaLimite < fechaCorte) {
         const dl = new Date(fechaCorte + "T00:00:00Z");
@@ -251,7 +241,6 @@ async function main() {
         fechaLimite = `${dl.getUTCFullYear()}-${String(dl.getUTCMonth()+1).padStart(2,"0")}-${String(dl.getUTCDate()).padStart(2,"0")}`;
       }
 
-      // Etiqueta: "ENE 2025", "DIC 2024", etc.
       const d     = new Date(fechaCorte + "T00:00:00Z");
       const mes   = d.getUTCMonth();
       const anio  = d.getUTCFullYear();
