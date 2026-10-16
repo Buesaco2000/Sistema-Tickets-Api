@@ -28,10 +28,11 @@ const crear = async (data, directorId, empresaId) => {
 
     // Obtener municipio_id del director desde la BD (no confiar en el cliente)
     const [[director]] = await conn.query(
-      'SELECT municipio_id FROM users WHERE id = ? LIMIT 1',
+      'SELECT municipio_id, nombres, apellidos FROM users WHERE id = ? LIMIT 1',
       [directorId]
     );
 
+    const nombreDirector = director ? `${director.nombres} ${director.apellidos}` : 'Sistema';
     let municipio_id = director?.municipio_id ?? null;
 
     // ADMIN no tiene municipio propio: derivarlo del primer ítem (recepción → municipio)
@@ -53,9 +54,11 @@ const crear = async (data, directorId, empresaId) => {
     // Insertar cabecera de la dispensación
     const [res] = await conn.query(
       `INSERT INTO dispensaciones
-         (empresa_id, tipo, municipio_id, director_id, destinatario_id, observaciones)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [empresaId, tipo, municipio_id, directorId, destinatario_id, observaciones || null]
+        (empresa_id, tipo, municipio_id, director_id, destinatario_id, observaciones,
+          estado, aceptado_por, fecha_aceptacion)
+      VALUES (?, ?, ?, ?, ?, ?, 'ACEPTADO', ?, NOW())`,
+      [empresaId, tipo, municipio_id, directorId, destinatario_id, observaciones || null,
+      nombreDirector]
     );
     const dispensacionId = res.insertId;
 
