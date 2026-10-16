@@ -45,7 +45,7 @@ const globalLimiter = rateLimit({
   message: { success: false, message: "Demasiadas peticiones, intente más tarde." },
 });
 
-// Límite estricto solo para login y refresh — previene fuerza bruta
+// Límite estricto solo para login y refresh
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,

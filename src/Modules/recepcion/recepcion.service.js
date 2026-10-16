@@ -621,9 +621,7 @@ const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
 
   let municipioId = null;
   let sedeId = null;
-  // ADMIN y Almacén ven todos los municipios sin filtro.
-  // Director Técnico: filtra por municipio, EXCEPTO San Juan de Villalobos que filtra por sede.
-  // Otros roles: solo su municipio.
+
   if (rolId !== ROLES.ADMIN && !esAlmacen) {
     const [[profile]] = await pool.query(
       `SELECT u.municipio_id, u.sede_id, s.nombre AS sede_nombre
@@ -751,7 +749,7 @@ const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) =>
 
   const { tipo_recepcion, fecha_desde, fecha_hasta } = query;
 
-  // ALMACEN/ADMIN ven todo; los demás solo sus propias salidas
+  // ALMACEN/ADMIN ven todo
   const userCond1 = !esAlmacen ? " AND sm.created_by = ?" : "";
   const userCond2 = !esAlmacen ? " AND d.director_id = ?"  : "";
   const catCond   = tipo_recepcion ? " AND i.tipo_recepcion = ?" : "";
@@ -798,28 +796,30 @@ const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) =>
 
   const [distribuciones] = await pool.query(
     `SELECT 'DISTRIBUCION' AS tipo_salida,
-            d.id,
-            DATE(d.created_at) AS fecha,
-            di.cantidad,
-            d.tipo              AS motivo,
-            CONCAT(u.nombres,' ',u.apellidos) AS responsable,
-            d.estado,
-            i.nombre,
-            i.codigo_interno,
-            i.lote,
-            i.tipo_recepcion,
-            mu.nombre  AS municipio,
-            NULL       AS municipio_destino,
-            d.created_at
-     FROM dispensacion_items di
-     JOIN dispensaciones d ON d.id = di.dispensacion_id
-     JOIN items_recepcion_inventario i ON i.id = di.item_id
-     JOIN recepciones_inventario r     ON r.id = i.recepcion_id
-     LEFT JOIN municipios mu ON mu.id = r.municipio_id
-     JOIN users u ON u.id = d.director_id
-     WHERE d.empresa_id = ? AND d.estado != 'RECHAZADO'
-       ${userCond2}${catCond}${datCond3}${datCond4}
-     ORDER BY d.created_at DESC`,
+          di.id,
+          DATE(d.created_at)              AS fecha,
+          di.cantidad,
+          d.tipo                          AS motivo,
+          CONCAT(u.nombres,' ',u.apellidos) AS responsable,
+          d.estado,
+          i.nombre,
+          i.codigo_interno,
+          di.lote,
+          i.tipo_recepcion,
+          mu.nombre                       AS municipio,
+          md.nombre                       AS municipio_destino,
+          d.created_at
+    FROM dispensacion_items di
+    JOIN dispensaciones d             ON d.id  = di.dispensacion_id
+    JOIN items_recepcion_inventario i ON i.id  = di.item_id
+    JOIN recepciones_inventario r     ON r.id  = i.recepcion_id
+    LEFT JOIN municipios mu           ON mu.id = r.municipio_id
+    LEFT JOIN municipios md           ON md.id = d.municipio_id
+    JOIN users u                      ON u.id  = d.director_id
+    WHERE d.empresa_id = ? AND d.estado != 'RECHAZADO'
+      ${userCond2}${catCond}${datCond3}${datCond4}
+    ORDER BY d.created_at DESC, di.id
+    `,
     baseParams([
       ...(fecha_desde ? [fecha_desde] : []),
       ...(fecha_hasta ? [fecha_hasta] : []),
