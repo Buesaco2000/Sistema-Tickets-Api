@@ -17,7 +17,7 @@ function tiposPermitidos(cargo = '') {
 
 
 const crear = async (data, directorId, empresaId) => {
-  const { tipo, destinatario_id, observaciones, items } = data;
+  const { tipo, destinatario_id, observaciones, fecha, items } = data;
 
   if (!Array.isArray(items) || items.length === 0)
     throw new AppError('Debes incluir al menos un medicamento.', 400);
@@ -35,7 +35,7 @@ const crear = async (data, directorId, empresaId) => {
     const nombreDirector = director ? `${director.nombres} ${director.apellidos}` : 'Sistema';
     let municipio_id = director?.municipio_id ?? null;
 
-    // ADMIN no tiene municipio propio: derivarlo del primer ítem (recepción → municipio)
+    // ADMIN no tiene municipio propio
     if (!municipio_id) {
       const [[itemRec]] = await conn.query(
         `SELECT r.municipio_id
@@ -54,10 +54,10 @@ const crear = async (data, directorId, empresaId) => {
     // Insertar cabecera de la dispensación
     const [res] = await conn.query(
       `INSERT INTO dispensaciones
-        (empresa_id, tipo, municipio_id, director_id, destinatario_id, observaciones,
+        (empresa_id, tipo, fecha, municipio_id, director_id, destinatario_id, observaciones,
           estado, aceptado_por, fecha_aceptacion)
-      VALUES (?, ?, ?, ?, ?, ?, 'ACEPTADO', ?, NOW())`,
-      [empresaId, tipo, municipio_id, directorId, destinatario_id, observaciones || null,
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'ACEPTADO', ?, NOW())`,
+      [empresaId, tipo, fecha, municipio_id, directorId, destinatario_id, observaciones || null,
       nombreDirector]
     );
     const dispensacionId = res.insertId;
