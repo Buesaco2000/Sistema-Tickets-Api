@@ -175,6 +175,7 @@ const saveBorrador = async (data, userId, empresaId) => {
     remision_factura,
     reactivos,
     responsable_recibe,
+    responsable_recibe_id,
     medicamentos,
     borradorId,
   } = data;
@@ -205,7 +206,8 @@ const saveBorrador = async (data, userId, empresaId) => {
       await conn.query(
         `UPDATE recepciones_inventario SET
            fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
-           proveedor = ?, remision_factura = ?, reactivos = ?, responsable_recibe = ?
+           proveedor = ?, remision_factura = ?, reactivos = ?,
+           responsable_recibe = ?, responsable_recibe_id = ?
          WHERE id = ?`,
         [
           fechaRecepcion,
@@ -217,6 +219,7 @@ const saveBorrador = async (data, userId, empresaId) => {
           remision_factura,
           reactivos || null,
           responsable_recibe,
+          responsable_recibe_id || null,
           recepcionId,
         ],
       );
@@ -225,8 +228,8 @@ const saveBorrador = async (data, userId, empresaId) => {
       const [result] = await conn.query(
         `INSERT INTO recepciones_inventario
            (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
-            remision_factura, reactivos, responsable_recibe, estado, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+            remision_factura, reactivos, responsable_recibe, responsable_recibe_id, estado, created_by)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           empresaId,
           fechaRecepcion,
@@ -238,6 +241,7 @@ const saveBorrador = async (data, userId, empresaId) => {
           remision_factura,
           reactivos || null,
           responsable_recibe,
+          responsable_recibe_id || null,
           "BORRADOR",
           userId,
         ],
@@ -279,6 +283,7 @@ const create = async (data, userId, empresaId) => {
     remision_factura,
     reactivos,
     responsable_recibe,
+    responsable_recibe_id,
     medicamentos,
     borradorId,
   } = data;
@@ -294,8 +299,8 @@ const create = async (data, userId, empresaId) => {
     const [result] = await conn.query(
       `INSERT INTO recepciones_inventario
          (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
-          remision_factura, reactivos, responsable_recibe, estado, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          remision_factura, reactivos, responsable_recibe, responsable_recibe_id, estado, created_by)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId,
         fechaRecepcion,
@@ -307,6 +312,7 @@ const create = async (data, userId, empresaId) => {
         remision_factura,
         reactivos || null,
         responsable_recibe,
+        responsable_recibe_id || null,
         "COMPLETADA",
         userId,
       ],
@@ -345,13 +351,14 @@ const softDelete = async (id, empresaId) => {
 
 // Solo ítems de recepciones COMPLETADAS (borradores no tienen stock)
 const findAllItems = async (empresaId, userId, rolId, cargo) => {
-  const c = (cargo || "").toLowerCase();
+  const c = (cargo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const esAlmacen  = c.includes("almacen");
   const esDirector = c.includes("director tecnico");
   const esPrivilegiado = esAlmacen || esDirector;
 
-  // ── Si NO es Admin ni Director/Almacén → mostrar dispensaciones aceptadas ──
+  // ── Si NO es Admin ni Director/Almacén → dispensaciones aceptadas + recepciones donde es responsable ──
   if (rolId !== ROLES.ADMIN && !esPrivilegiado) {
+    // Ítems dispensados al usuario
     const [rowsDest] = await pool.query(
       `SELECT i.id, i.recepcion_id,
               i.tipo_recepcion,
@@ -379,6 +386,42 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
        ORDER BY di.medicamento_nombre ASC`,
       [userId, empresaId],
     );
+
+    // Ítems de recepciones donde este usuario es responsable_recibe_id
+    const [rowsResp] = await pool.query(
+      `SELECT i.id, i.recepcion_id,
+              i.tipo_recepcion,
+              i.codigo_interno, i.nombre,
+              i.presentacion_comercial, i.concentracion,
+              i.fecha_vencimiento, i.lote,
+              i.cant_solicitada, i.cant_recepcionada,
+              GREATEST(0,
+                COALESCE(i.cant_recepcionada, 0)
+                - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                            WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+                - COALESCE((SELECT SUM(di2.cantidad) FROM dispensacion_items di2
+                            JOIN dispensaciones d2 ON d2.id = di2.dispensacion_id
+                            WHERE di2.item_id = i.id AND d2.estado != 'RECHAZADO'), 0)
+              ) AS stock,
+              r.fecha AS fecha_recepcion, r.proveedor
+       FROM items_recepcion_inventario i
+       JOIN recepciones_inventario r ON r.id = i.recepcion_id
+       WHERE r.responsable_recibe_id = ?
+         AND r.empresa_id = ?
+         AND r.estado = 'COMPLETADA'
+         AND r.deleted_at IS NULL
+       ORDER BY i.nombre ASC`,
+      [userId, empresaId],
+    );
+
+    // Unificar evitando duplicados por id de ítem
+    const vistos = new Set(rowsDest.map((r) => r.id));
+    for (const row of rowsResp) {
+      if (!vistos.has(row.id)) {
+        vistos.add(row.id);
+        rowsDest.push(row);
+      }
+    }
 
     for (const row of rowsDest) {
       row.dispensaciones = [];
@@ -437,6 +480,7 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
                           WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
             ) AS stock,
             r.fecha AS fecha_recepcion, r.proveedor,
+            r.remision_factura AS no_factura,
             mu.nombre AS municipio,
             se.nombre AS sede,
             c.forma_farmaceutica
@@ -615,7 +659,7 @@ const getDispensacionesByItem = async (itemId, empresaId) => {
 };
 
 const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
-  const c = (cargo || "").toLowerCase();
+  const c = (cargo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const esAlmacen  = c.includes("almacen");
   const esDirector = c.includes("director tecnico");
 
@@ -744,7 +788,7 @@ const getTrazabilidad = async (itemId, empresaId) => {
 };
 
 const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) => {
-  const c = (cargo || "").toLowerCase();
+  const c = (cargo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   const esAlmacen = c.includes("almacen") || rolId === ROLES.ADMIN;
 
   const { tipo_recepcion, fecha_desde, fecha_hasta } = query;
