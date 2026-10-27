@@ -168,13 +168,14 @@ const listar = async (empresaId, userId, rolId, cargo, pag = { page: 1, limit: 1
             mu.nombre  AS municipio,
             ud.nombres AS director_nombre, ud.apellidos AS director_apellidos,
             ur.nombres AS dest_nombre,    ur.apellidos AS dest_apellidos,
-            ur.cargo   AS dest_cargo,
+            cr.nombre  AS dest_cargo,
             COUNT(di.id)           AS total_items,
             COALESCE(SUM(di.cantidad), 0) AS total_unidades
      FROM dispensaciones d
      JOIN municipios mu ON mu.id = d.municipio_id
      JOIN users ud      ON ud.id = d.director_id
      JOIN users ur      ON ur.id = d.destinatario_id
+     LEFT JOIN cargos cr ON cr.id = ur.cargo_id
      LEFT JOIN dispensacion_items di ON di.dispensacion_id = d.id
      WHERE ${where}
      GROUP BY d.id
@@ -194,11 +195,12 @@ const detalle = async (dispensacionId, empresaId) => {
             mu.nombre  AS municipio,
             ud.nombres AS director_nombre, ud.apellidos AS director_apellidos,
             ur.nombres AS dest_nombre,    ur.apellidos AS dest_apellidos,
-            ur.cargo   AS dest_cargo
+            cr.nombre  AS dest_cargo
      FROM dispensaciones d
      JOIN municipios mu ON mu.id = d.municipio_id
      JOIN users ud      ON ud.id = d.director_id
      JOIN users ur      ON ur.id = d.destinatario_id
+     LEFT JOIN cargos cr ON cr.id = ur.cargo_id
      WHERE d.id = ? AND d.empresa_id = ?`,
     [dispensacionId, empresaId]
   );
