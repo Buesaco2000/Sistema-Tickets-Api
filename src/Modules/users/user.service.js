@@ -4,16 +4,16 @@ const AppError    = require('../../Utils/AppError');
 const { getPagination, buildMeta } = require('../../Utils/pagination');
 const { logAudit } = require('../../Utils/auditLog');
 
-const findDirectorio = async (empresaId) => {
-  // Devolvemos cargo para que el frontend pueda mostrarlo en el Autocomplete
-  // y filtrar quién puede ser destinatario de una dispensación
+const findDirectorio = async (empresaId, rolId = null) => {
+  const rolCond = rolId ? ' AND u.rol_id = ?' : '';
+  const params  = rolId ? [empresaId, rolId] : [empresaId];
   const [rows] = await pool.query(
-    `SELECT u.id, u.nombres, u.apellidos, c.nombre AS cargo
+    `SELECT u.id, u.nombres, u.apellidos, c.nombre AS cargo, u.cargo_id
      FROM users u
      LEFT JOIN cargos c ON c.id = u.cargo_id
-     WHERE u.empresa_id = ? AND u.deleted_at IS NULL AND u.activo = 1
+     WHERE u.empresa_id = ? AND u.deleted_at IS NULL AND u.activo = 1${rolCond}
      ORDER BY u.nombres ASC`,
-    [empresaId]
+    params
   );
   return rows;
 };

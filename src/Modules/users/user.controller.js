@@ -6,7 +6,8 @@ const ROLES                  = require('../../Utils/roles');
 
 const getDirectorio = async (req, res, next) => {
   try {
-    const rows = await userService.findDirectorio(req.user.empresa_id);
+    const rolId = req.query.rol_id ? parseInt(req.query.rol_id, 10) : null;
+    const rows = await userService.findDirectorio(req.user.empresa_id, rolId);
     return success(res, rows);
   } catch (err) { next(err); }
 };
