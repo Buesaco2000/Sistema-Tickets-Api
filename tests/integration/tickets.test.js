@@ -1,20 +1,13 @@
-/**
- * Tickets — Integration tests (Jest + Supertest)
- * Escenarios hospitalarios:
- *   • Ventilador fuera de servicio (ticket CRITICA)
- *   • Ruptura de cadena frío (ticket ALTA)
- *   • Auditoría INVIMA (asignación multi-usuario)
- */
 const request = require('supertest');
 const jwt     = require('jsonwebtoken');
 
-jest.mock('../../src/config/database', () => ({
+jest.mock('../../src/Config/database', () => ({
   query:         jest.fn(),
   getConnection: jest.fn(),
   end:           jest.fn(),
 }));
 
-const pool = require('../../src/config/database');
+const pool = require('../../src/Config/database');
 const app  = require('../../app');
 
 const JWT_SECRET = 'test_secret_key_256_bits_minimum_length';
@@ -31,9 +24,8 @@ const cookie = (t) => ({ Cookie: `accessToken=${t}` });
 // resetAllMocks limpia también la cola de mockResolvedValueOnce
 afterEach(() => jest.resetAllMocks());
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 1 — Ventilador fuera de servicio (ticket CRITICA)
-// ─────────────────────────────────────────────────────────────
+
+// SUITE 1  Ventilador fuera de servicio (ticket CRITICA)
 describe('Escenario: Ventilador fuera de servicio (ticket CRITICA)', () => {
   const token = makeToken({ rol_id: 2 });
 
@@ -113,9 +105,8 @@ describe('Escenario: Ventilador fuera de servicio (ticket CRITICA)', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 2 — Ruptura de cadena frío
-// ─────────────────────────────────────────────────────────────
+
+// SUITE 2  Ruptura de cadena frío
 describe('Escenario: Ruptura de cadena frío — nevera de vacunas (ticket ALTA)', () => {
   const token = makeToken({ rol_id: 3, id: 8 }); // SALUD
 
@@ -154,9 +145,8 @@ describe('Escenario: Ruptura de cadena frío — nevera de vacunas (ticket ALTA)
   });
 });
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 3 — Auditoría INVIMA — asignación de usuarios
-// ─────────────────────────────────────────────────────────────
+
+// SUITE 3  Auditoría INVIMA — asignación de usuarios
 describe('Escenario: Auditoría INVIMA — asignación de usuarios', () => {
   const tokenAdmin = makeToken({ rol_id: 1, id: 1 });
 
@@ -189,9 +179,8 @@ describe('Escenario: Auditoría INVIMA — asignación de usuarios', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 4 — Paginación y filtros
-// ─────────────────────────────────────────────────────────────
+
+// SUITE 4  Paginación y filtros
 describe('GET /api/v1/tickets — filtros y paginación', () => {
   const token = makeToken();
 

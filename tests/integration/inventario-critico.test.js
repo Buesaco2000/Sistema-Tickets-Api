@@ -1,15 +1,8 @@
-/**
- * Inventario — Tests de integración de flujos críticos
- * Cubre los 7 escenarios de mayor riesgo del módulo de inventario.
- *
- * Ejecutar: npm run test -- --testPathPattern=inventario-critico
- */
-
 process.env.JWT_ACCESS_SECRET  = 'test_secret_key_256_bits_minimum_length';
 process.env.JWT_REFRESH_SECRET = 'test_refresh_secret_256_bits_minimum_length';
 process.env.RESEND_API_KEY     = 're_test_dummy_key';
 
-jest.mock('../../src/Utils/mailer', () => ({
+jest.mock('../../src/Utils/mailer.js', () => ({
   sendPasswordReset: jest.fn().mockResolvedValue({}),
 }));
 
@@ -25,7 +18,7 @@ jest.mock('../../src/Config/database', () => ({
 const pool = require('../../src/Config/database');
 const app  = require('../../app');
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+//  Helpers 
 
 const token = (overrides = {}) =>
   jwt.sign(
@@ -49,9 +42,7 @@ const primerQuery = () => ({
 
 afterEach(() => jest.resetAllMocks());
 
-// ──────────────────────────────────────────────────────────────────────────
-// SUITE 1 — Salidas directas: control de stock
-// ──────────────────────────────────────────────────────────────────────────
+// SUITE 1  Salidas directas: control de stock
 describe('POST /salidas — control de stock', () => {
   const url = '/api/v1/recepciones/medicamentos/salidas';
 
@@ -157,9 +148,7 @@ describe('POST /salidas — control de stock', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────
-// SUITE 2 — Ajustes de inventario
-// ──────────────────────────────────────────────────────────────────────────
+// SUITE 2  Ajustes de inventario
 describe('POST /ajustes-inventario — validaciones', () => {
   const url = '/api/v1/ajustes-inventario';
 
@@ -244,9 +233,8 @@ describe('POST /ajustes-inventario — validaciones', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────
-// SUITE 3 — Filtro de categorías por cargo Auxiliar
-// ──────────────────────────────────────────────────────────────────────────
+
+// SUITE 3  Filtro de categorías por cargo Auxiliar
 describe('GET /items — filtro de categorías por cargo', () => {
   const url = '/api/v1/recepciones/medicamentos/items';
 
@@ -289,9 +277,8 @@ describe('GET /items — filtro de categorías por cargo', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────
-// SUITE 4 — Alertas badge: estructura de respuesta
-// ──────────────────────────────────────────────────────────────────────────
+
+// SUITE 4  Alertas badge: estructura de respuesta
 describe('GET /alertas-badge — estructura', () => {
   const url = '/api/v1/recepciones/medicamentos/alertas-badge';
 
@@ -346,9 +333,8 @@ describe('GET /alertas-badge — estructura', () => {
   });
 });
 
-// ──────────────────────────────────────────────────────────────────────────
-// SUITE 5 — Multi-tenancy: empresa_id siempre presente
-// ──────────────────────────────────────────────────────────────────────────
+
+// SUITE 5  Multi-tenancy: empresa_id siempre presente
 describe('Multi-tenancy — empresa_id en todos los módulos', () => {
   it('GET /items incluye empresa_id en el SQL', async () => {
     pool.query.mockResolvedValue([[]]);

@@ -1,8 +1,3 @@
-/**
- * Auth — Integration tests (Jest + Supertest)
- * Instalar: npm i -D jest supertest
- * Ejecutar:  npx jest tests/integration/auth.test.js
- */
 const request  = require('supertest');
 const bcrypt   = require('bcrypt');
 
@@ -10,8 +5,8 @@ const bcrypt   = require('bcrypt');
 process.env.JWT_ACCESS_SECRET  = 'test_secret_key_256_bits_minimum_length';
 process.env.JWT_REFRESH_SECRET = 'test_refresh_secret_256_bits_minimum_length';
 
-// ── Mock del pool de base de datos ───────────────────────────
-jest.mock('../../src/config/database', () => {
+//  Mock del pool de base de datos 
+jest.mock('../../src/Config/database', () => {
   const pool = {
     query:         jest.fn(),
     getConnection: jest.fn(),
@@ -20,7 +15,7 @@ jest.mock('../../src/config/database', () => {
   return pool;
 });
 
-const pool = require('../../src/config/database');
+const pool = require('../../src/Config/database');
 const app  = require('../../app');
 
 // Usuario de prueba base
@@ -50,7 +45,7 @@ beforeAll(async () => {
 
 afterEach(() => jest.resetAllMocks());
 
-// ── Helpers ───────────────────────────────────────────────────
+//  Helpers 
 const mockLogin = (userOverride = {}) => {
   const user = { ...TEST_USER, password: hashedPassword, ...userOverride };
   pool.query
@@ -58,11 +53,9 @@ const mockLogin = (userOverride = {}) => {
     .mockResolvedValueOnce([{ insertId: 1 }]); // INSERT refresh_token
 };
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 1 — Login
-// ─────────────────────────────────────────────────────────────
+// SUITE 1  Login
 describe('POST /api/v1/auth/login', () => {
-  it('200 — credenciales válidas retornan cookie + perfil', async () => {
+  it('200 - credenciales válidas retornan cookie + perfil', async () => {
     mockLogin();
 
     const res = await request(app)
@@ -76,7 +69,7 @@ describe('POST /api/v1/auth/login', () => {
     expect(res.headers['set-cookie']).toBeDefined();
   });
 
-  it('401 — password incorrecto retorna mensaje vago (anti-enumeración)', async () => {
+  it('401 - password incorrecto retorna mensaje vago (anti-enumeración)', async () => {
     mockLogin();
 
     const res = await request(app)
@@ -87,7 +80,7 @@ describe('POST /api/v1/auth/login', () => {
     expect(res.body.message).toBe('Credenciales inválidas.');
   });
 
-  it('401 — usuario inexistente en empresa retorna mismo mensaje vago', async () => {
+  it('401 - usuario inexistente en empresa retorna mismo mensaje vago', async () => {
     pool.query.mockResolvedValueOnce([[]]); // no rows
 
     const res = await request(app)
@@ -151,11 +144,10 @@ describe('POST /api/v1/auth/login', () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 2 — /auth/me (ruta protegida)
-// ─────────────────────────────────────────────────────────────
+
+// SUITE 2  /auth/me (ruta protegida)
 describe('GET /api/v1/auth/me', () => {
-  it('401 — sin cookie de acceso rechaza', async () => {
+  it('401 - sin cookie de acceso rechaza', async () => {
     const res = await request(app).get('/api/v1/auth/me');
     expect(res.status).toBe(401);
   });

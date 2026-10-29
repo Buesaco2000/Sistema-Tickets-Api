@@ -1,17 +1,13 @@
-/**
- * Inventory (Recepción de medicamentos) — Integration tests
- * Escenario: medicamento vencido + control de cadena frío
- */
 const request = require('supertest');
 const jwt     = require('jsonwebtoken');
 
-jest.mock('../../src/config/database', () => ({
+jest.mock('../../src/Config/database', () => ({
   query:         jest.fn(),
   getConnection: jest.fn(),
   end:           jest.fn(),
 }));
 
-const pool = require('../../src/config/database');
+const pool = require('../../src/Config/database');
 const app  = require('../../app');
 
 const makeToken = (overrides = {}) =>
@@ -25,9 +21,8 @@ const cookie = (t) => ({ Cookie: `accessToken=${t}` });
 
 afterEach(() => jest.resetAllMocks());
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 1 — Escenario: recepción con medicamento próximo a vencer
-// ─────────────────────────────────────────────────────────────
+
+// SUITE 1  Escenario: recepción con medicamento próximo a vencer
 describe('Escenario: Recepción de medicamentos — vencimiento y cadena frío', () => {
   const token = makeToken();
 
@@ -127,9 +122,8 @@ describe('Escenario: Recepción de medicamentos — vencimiento y cadena frío',
   });
 });
 
-// ─────────────────────────────────────────────────────────────
-// SUITE 2 — GET /items — inventario con semáforo vencimiento
-// ─────────────────────────────────────────────────────────────
+
+// SUITE 2  GET /items - inventario con semáforo vencimiento
 describe('GET /api/v1/recepciones/medicamentos/items — semáforo vencimiento', () => {
   const token = makeToken();
 

@@ -116,6 +116,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
       m.cant_solicitada || null,
       m.cant_recepcionada || null,
       m.cant_faltante || null,
+      m.precio_unitario != null ? Number(m.precio_unitario) : null,
       m.lote || null,
       m.cadena_frio ?? false,
       m.temperatura || null,
@@ -137,7 +138,7 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
           catalogo_id=?, tipo_recepcion=?, codigo_interno=?, nombre=?, presentacion_comercial=?,
           concentracion=?, ium=?, unidad_medida=?, fecha_vencimiento=?, registro_sanitario=?,
           estado_registro=?, autorizacion_uso=?, cum=?, atc=?, laboratorio=?, clasificacion_riesgo=?, vida_util=?,
-          serie=?, cant_solicitada=?, cant_recepcionada=?, cant_faltante=?, lote=?, cadena_frio=?,
+          serie=?, cant_solicitada=?, cant_recepcionada=?, cant_faltante=?, precio_unitario=?, lote=?, cadena_frio=?,
           temperatura=?, snna=?, ta=?, cod=?, acr=?, estado_empaque=?, humedo=?, colapsado=?,
           manchado=?, etiquetas=?, tipo_etiquetas=?
         WHERE id = ? AND recepcion_id = ?`,
@@ -151,11 +152,11 @@ const _syncItems = async (conn, recepcionId, medicamentos) => {
             fecha_vencimiento, registro_sanitario, estado_registro, autorizacion_uso,
             cum, atc, laboratorio,
             clasificacion_riesgo, vida_util, serie,
-            cant_solicitada, cant_recepcionada, cant_faltante, lote,
+            cant_solicitada, cant_recepcionada, cant_faltante, precio_unitario, lote,
             cadena_frio, temperatura, snna, ta, cod, acr,
             estado_empaque,
             humedo, colapsado, manchado, etiquetas, tipo_etiquetas)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [recepcionId, ...valores],
       );
     }
@@ -399,7 +400,7 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
               i.codigo_interno, i.nombre,
               i.presentacion_comercial, i.concentracion,
               i.fecha_vencimiento, i.lote,
-              i.cant_solicitada, i.cant_recepcionada,
+              i.cant_solicitada, i.cant_recepcionada, i.precio_unitario,
               GREATEST(0,
                 COALESCE(i.cant_recepcionada, 0)
                 - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
@@ -408,6 +409,14 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
                             JOIN dispensaciones d2 ON d2.id = di2.dispensacion_id
                             WHERE di2.item_id = i.id AND d2.estado != 'RECHAZADO'), 0)
               ) AS stock,
+              GREATEST(0,
+                COALESCE(i.cant_recepcionada, 0)
+                - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                            WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+                - COALESCE((SELECT SUM(di2.cantidad) FROM dispensacion_items di2
+                            JOIN dispensaciones d2 ON d2.id = di2.dispensacion_id
+                            WHERE di2.item_id = i.id AND d2.estado != 'RECHAZADO'), 0)
+              ) * COALESCE(i.precio_unitario, 0) AS valor_total,
               r.fecha AS fecha_recepcion, r.proveedor
        FROM items_recepcion_inventario i
        JOIN recepciones_inventario r ON r.id = i.recepcion_id
@@ -475,7 +484,7 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
             i.tipo_recepcion,
             i.codigo_interno, i.nombre, i.presentacion_comercial,
             i.concentracion, i.fecha_vencimiento, i.lote,
-            i.cant_solicitada, i.cant_recepcionada,
+            i.cant_solicitada, i.cant_recepcionada, i.precio_unitario,
             GREATEST(0,
               COALESCE(i.cant_recepcionada, 0)
               - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
@@ -486,6 +495,16 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
               + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
                           WHERE a.item_id = i.id), 0)
             ) AS stock,
+            GREATEST(0,
+              COALESCE(i.cant_recepcionada, 0)
+              - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+              - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                          JOIN dispensaciones d ON d.id = di.dispensacion_id
+                          WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+              + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                          WHERE a.item_id = i.id), 0)
+            ) * COALESCE(i.precio_unitario, 0) AS valor_total,
             r.fecha AS fecha_recepcion, r.proveedor,
             r.remision_factura AS no_factura,
             mu.nombre AS municipio,

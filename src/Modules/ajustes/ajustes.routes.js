@@ -1,8 +1,9 @@
-const router = require('express').Router();
-const svc    = require('./ajustes.service');
+const router   = require('express').Router();
+const svc      = require('./ajustes.service');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
-const ROLES            = require('../../Utils/roles');
+const ROLES    = require('../../Utils/roles');
+const AppError = require('../../Utils/AppError');
 
 router.use(authenticate);
 
@@ -14,7 +15,7 @@ router.post('/', authorize(ROLES.ADMIN, ROLES.SALUD), async (req, res, next) => 
     const esDirector = cargo.includes('director tecnico');
 
     if (req.user.rol_id !== ROLES.ADMIN && !esAlmacen && !esDirector) {
-      return next(Object.assign(new Error('No autorizado para crear ajustes de inventario.'), { statusCode: 403 }));
+      return next(new AppError('No autorizado para crear ajustes de inventario.', 403));
     }
 
     const data = await svc.create(req.body, req.user.id, req.user.empresa_id);
