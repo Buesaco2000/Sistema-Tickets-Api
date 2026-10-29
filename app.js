@@ -152,6 +152,7 @@ v1.use("/recepciones/medicamentos",   require("./src/Modules/recepcion/recepcion
 v1.use("/traslados",                  require("./src/Modules/traslados/traslados.routes.js"));
 v1.use("/dispensaciones",             require("./src/Modules/dispensaciones/dispensaciones.routes.js"));
 v1.use("/stock-minimo",               require("./src/Modules/stockMinimo/stockMinimo.routes.js"));
+v1.use("/ajustes-inventario",         require("./src/Modules/ajustes/ajustes.routes.js"));
 
 // RUTAS DE INFORMES
 v1.use("/informes", require("./src/Modules/informes/informes.routes.js"));

@@ -86,6 +86,55 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
   } catch (err) { next(err); }
 });
 
+// Endpoint ligero para el badge del Sidebar — solo cuenta ítems por vencer y vencidos con stock > 0
+router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const pool = require('../../Config/database');
+    const eid  = req.user.empresa_id;
+    const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const verTodo = req.user.rol_id === 1
+      || cargo.includes('almacen')
+      || cargo.includes('director tecnico');
+    const municipioId = !verTodo && req.user.municipio_id ? req.user.municipio_id : null;
+    const munCond = municipioId ? ' AND r2.municipio_id = ?' : '';
+
+    const stockCalc = `(
+      COALESCE(i.cant_recepcionada, 0)
+      - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                  WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+      - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                  JOIN dispensaciones d ON d.id = di.dispensacion_id
+                  WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+      + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                  WHERE a.item_id = i.id), 0)
+    )`;
+
+    const base = [eid, ...(municipioId ? [municipioId] : [])];
+
+    const [[row]] = await pool.query(`
+      SELECT
+        COALESCE(SUM(
+          i.fecha_vencimiento IS NOT NULL
+          AND i.fecha_vencimiento < CURDATE()
+          AND ${stockCalc} > 0
+        ), 0) AS vencidos,
+        COALESCE(SUM(
+          i.fecha_vencimiento IS NOT NULL
+          AND i.fecha_vencimiento >= CURDATE()
+          AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+          AND ${stockCalc} > 0
+        ), 0) AS proximos_vencer
+      FROM items_recepcion_inventario i
+      JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
+      WHERE r2.empresa_id = ?${munCond}
+        AND r2.deleted_at IS NULL
+        AND r2.estado = 'COMPLETADA'
+    `, base);
+
+    res.json({ success: true, data: { vencidos: Number(row.vencidos), proximos_vencer: Number(row.proximos_vencer) } });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.findAll(req.user.empresa_id);
