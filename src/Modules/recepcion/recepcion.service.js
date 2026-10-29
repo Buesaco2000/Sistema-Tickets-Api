@@ -355,6 +355,11 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
   const esAlmacen  = c.includes("almacen");
   const esDirector = c.includes("director tecnico");
   const esPrivilegiado = esAlmacen || esDirector;
+  // Auxiliar sin acceso a almacén no puede ver MEDICAMENTOS ni MQ
+  const esAuxiliar = !esPrivilegiado && c.includes("auxiliar");
+  const catFilter  = esAuxiliar
+    ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
+    : "";
 
   // ── Si NO es Admin ni Director/Almacén → dispensaciones aceptadas + recepciones donde es responsable ──
   if (rolId !== ROLES.ADMIN && !esPrivilegiado) {
@@ -382,7 +387,7 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
        JOIN users ud ON ud.id = d.director_id
        WHERE d.destinatario_id = ?
          AND d.empresa_id = ?
-         AND d.estado = 'ACEPTADO'
+         AND d.estado = 'ACEPTADO'${catFilter}
        ORDER BY di.medicamento_nombre ASC`,
       [userId, empresaId],
     );
@@ -409,7 +414,7 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
        WHERE r.responsable_recibe_id = ?
          AND r.empresa_id = ?
          AND r.estado = 'COMPLETADA'
-         AND r.deleted_at IS NULL
+         AND r.deleted_at IS NULL${catFilter}
        ORDER BY i.nombre ASC`,
       [userId, empresaId],
     );
@@ -478,6 +483,8 @@ const findAllItems = async (empresaId, userId, rolId, cargo) => {
               - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
                           JOIN dispensaciones d ON d.id = di.dispensacion_id
                           WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+              + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                          WHERE a.item_id = i.id), 0)
             ) AS stock,
             r.fecha AS fecha_recepcion, r.proveedor,
             r.remision_factura AS no_factura,
@@ -543,6 +550,8 @@ const createSalida = async (data, userId, empresaId) => {
             COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
                       JOIN dispensaciones d ON d.id = di.dispensacion_id
                       WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0) AS total_dispensado,
+            COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                      WHERE a.item_id = i.id), 0) AS total_ajustes,
             r.municipio_id AS municipio_origen_id,
             r.sede_id      AS sede_origen_id
      FROM items_recepcion_inventario i
@@ -555,7 +564,7 @@ const createSalida = async (data, userId, empresaId) => {
 
   const stock = Math.max(
     0,
-    item.cant_recepcionada - item.total_salidas - item.total_dispensado,
+    item.cant_recepcionada - item.total_salidas - item.total_dispensado + item.total_ajustes,
   );
   if (cantidad > stock) {
     throw new AppError(`Stock insuficiente. Disponible: ${stock}`, 400);
@@ -784,7 +793,17 @@ const getTrazabilidad = async (itemId, empresaId) => {
     [itemId]
   );
 
-  return { item, salidas, dispensaciones, traslados };
+  const [ajustes] = await pool.query(
+    `SELECT a.id, a.cantidad, a.concepto, a.motivo, a.created_at,
+            CONCAT(u.nombres, ' ', u.apellidos) AS creado_por_nombre
+     FROM ajustes_inventario a
+     JOIN users u ON u.id = a.creado_por
+     WHERE a.item_id = ?
+     ORDER BY a.created_at DESC`,
+    [itemId]
+  );
+
+  return { item, salidas, dispensaciones, traslados, ajustes };
 };
 
 const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) => {
