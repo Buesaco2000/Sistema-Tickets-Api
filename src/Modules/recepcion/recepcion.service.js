@@ -688,8 +688,13 @@ const getDispensacionesByItem = async (itemId, empresaId) => {
 
 const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
   const c = (cargo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const esAlmacen  = c.includes("almacen");
-  const esDirector = c.includes("director tecnico");
+  const esAlmacen      = c.includes("almacen");
+  const esDirector     = c.includes("director tecnico");
+  const esPrivilegiado = esAlmacen || esDirector;
+  const esAuxiliar     = rolId !== ROLES.ADMIN && !esPrivilegiado && c.includes("auxiliar");
+  const catFilter      = esAuxiliar
+    ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
+    : "";
 
   let municipioId = null;
   let sedeId = null;
@@ -748,7 +753,7 @@ const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes se ON se.id = r.sede_id
      LEFT JOIN catalogo_items c ON c.id = i.catalogo_id
-     WHERE ${conds.join(' AND ')}
+     WHERE ${conds.join(' AND ')}${catFilter}
      ORDER BY i.tipo_recepcion, i.nombre ASC`,
     params
   );
