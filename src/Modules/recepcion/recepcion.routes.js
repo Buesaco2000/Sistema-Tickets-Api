@@ -71,14 +71,15 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
 
       pool.query(`
         SELECT r.id, r.municipio_id, m.nombre AS municipio, r.estado,
+               r.remision_factura,
                r.created_at, CONCAT(u.nombres,' ',u.apellidos) AS creado_por,
                COUNT(i.id) AS total_items
         FROM recepciones_inventario r
         LEFT JOIN municipios m ON m.id = r.municipio_id
         LEFT JOIN users u ON u.id = r.created_by
         LEFT JOIN items_recepcion_inventario i ON i.recepcion_id = r.id
-        WHERE r.empresa_id = ?${munCond} AND r.deleted_at IS NULL
-        GROUP BY r.id, m.nombre, r.estado, r.created_at, u.nombres, u.apellidos, r.municipio_id
+        WHERE r.empresa_id = ?${munCond} AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
+        GROUP BY r.id, m.nombre, r.estado, r.remision_factura, r.created_at, u.nombres, u.apellidos, r.municipio_id
         ORDER BY r.created_at DESC LIMIT 6`, [eid, ...munParam]),
     ]);
 
@@ -111,8 +112,9 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
 
     const base = [eid, ...(municipioId ? [municipioId] : [])];
 
-    const [[row]] = await pool.query(`
+    const [rows] = await pool.query(`
       SELECT
+        i.tipo_recepcion,
         COALESCE(SUM(
           i.fecha_vencimiento IS NOT NULL
           AND i.fecha_vencimiento < CURDATE()
@@ -129,9 +131,27 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
       WHERE r2.empresa_id = ?${munCond}
         AND r2.deleted_at IS NULL
         AND r2.estado = 'COMPLETADA'
+      GROUP BY i.tipo_recepcion
     `, base);
 
-    res.json({ success: true, data: { vencidos: Number(row.vencidos), proximos_vencer: Number(row.proximos_vencer) } });
+    // Totales globales + desglose por categoría
+    let totalVencidos = 0, totalProximos = 0;
+    const porCategoria = {};
+    for (const r of rows) {
+      const v = Number(r.vencidos), p = Number(r.proximos_vencer);
+      totalVencidos += v;
+      totalProximos += p;
+      porCategoria[r.tipo_recepcion] = { vencidos: v, proximos_vencer: p };
+    }
+
+    res.json({
+      success: true,
+      data: {
+        vencidos:        totalVencidos,
+        proximos_vencer: totalProximos,
+        por_categoria:   porCategoria,
+      },
+    });
   } catch (err) { next(err); }
 });
 
