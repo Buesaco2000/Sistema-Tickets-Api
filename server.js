@@ -1,12 +1,16 @@
 require('dotenv').config();
 const app    = require('./app');
-const pool   = require('./src/config/database');
-const logger = require('./src/utils/logger');
+const pool   = require('./src/Config/database');
+const logger = require('./src/Utils/logger');
 
 const PORT = process.env.PORT || 3000;
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   logger.info(`Server on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  if (process.env.NODE_ENV !== 'test') {
+    const { startVencimientoJob } = require('./src/Jobs/vencimientoJob');
+    startVencimientoJob();
+  }
 });
 
 const shutdown = async (signal) => {
