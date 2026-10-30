@@ -52,16 +52,25 @@ router.get('/publicas', async (req, res, next) => {
 
 router.use(authenticate);
 
-// Devuelve solo las sedes de la empresa del usuario autenticado
+// Devuelve las sedes de la empresa; filtra por municipio_id si se pasa
 router.get('/', async (req, res, next) => {
   try {
+    const municipioId = parseInt(req.query.municipio_id, 10);
+    const conds  = ['s.empresa_id = ?'];
+    const params = [req.user.empresa_id];
+
+    if (municipioId && !isNaN(municipioId)) {
+      conds.push('s.municipio_id = ?');
+      params.push(municipioId);
+    }
+
     const [rows] = await pool.query(
       `SELECT s.id, s.nombre, s.municipio_id, m.nombre AS municipio
        FROM sedes s
        JOIN municipios m ON m.id = s.municipio_id
-       WHERE s.empresa_id = ?
+       WHERE ${conds.join(' AND ')}
        ORDER BY s.nombre`,
-      [req.user.empresa_id]
+      params
     );
     return success(res, rows);
   } catch (e) { next(e); }

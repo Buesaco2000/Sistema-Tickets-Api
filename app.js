@@ -153,6 +153,7 @@ v1.use("/traslados",                  require("./src/Modules/traslados/traslados
 v1.use("/dispensaciones",             require("./src/Modules/dispensaciones/dispensaciones.routes.js"));
 v1.use("/stock-minimo",               require("./src/Modules/stockMinimo/stockMinimo.routes.js"));
 v1.use("/ajustes-inventario",         require("./src/Modules/ajustes/ajustes.routes.js"));
+v1.use("/conteos-fisicos",            require("./src/Modules/conteoFisico/conteoFisico.routes.js"));
 
 // RUTAS DE INFORMES
 v1.use("/informes", require("./src/Modules/informes/informes.routes.js"));
