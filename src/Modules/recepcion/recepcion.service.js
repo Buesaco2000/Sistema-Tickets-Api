@@ -918,6 +918,90 @@ const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) =>
   return todos;
 };
 
+const getValorizadoReporte = async (empresaId, userId, rolId, cargo, filters = {}) => {
+  const c = (cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const esAlmacen      = c.includes('almacen');
+  const esDirector     = c.includes('director tecnico');
+  const esPrivilegiado = esAlmacen || esDirector;
+  const esAuxiliar     = rolId !== ROLES.ADMIN && !esPrivilegiado && c.includes('auxiliar');
+
+  const conds  = ["r.empresa_id = ?", "r.deleted_at IS NULL", "r.estado = 'COMPLETADA'"];
+  const params = [empresaId];
+
+  // Scope geográfico (igual que findItemsForReport)
+  let municipioId = null;
+  let sedeId      = null;
+  if (rolId !== ROLES.ADMIN && !esAlmacen) {
+    const [[profile]] = await pool.query(
+      `SELECT u.municipio_id, u.sede_id, s.nombre AS sede_nombre
+       FROM users u LEFT JOIN sedes s ON s.id = u.sede_id
+       WHERE u.id = ? LIMIT 1`,
+      [userId],
+    );
+    if (profile) {
+      municipioId = profile.municipio_id;
+      const esSanJuan = (profile.sede_nombre || '').toUpperCase().includes('SAN JUAN');
+      if (esSanJuan) sedeId = profile.sede_id;
+    }
+  }
+  if (sedeId)       { conds.push('r.sede_id = ?');      params.push(sedeId); }
+  else if (municipioId) { conds.push('r.municipio_id = ?'); params.push(municipioId); }
+
+  // Filtros opcionales del request
+  if (filters.municipio_id) { conds.push('r.municipio_id = ?'); params.push(Number(filters.municipio_id)); }
+  if (filters.sede_id)      { conds.push('r.sede_id = ?');      params.push(Number(filters.sede_id)); }
+  if (filters.desde)        { conds.push('r.fecha >= ?');        params.push(filters.desde); }
+  if (filters.hasta)        { conds.push('r.fecha <= ?');        params.push(filters.hasta); }
+  if (filters.tipo) {
+    const tipos = Array.isArray(filters.tipo) ? filters.tipo : [filters.tipo];
+    conds.push(`i.tipo_recepcion IN (${tipos.map(() => '?').join(',')})`);
+    params.push(...tipos);
+  }
+  if (esAuxiliar) {
+    conds.push("i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')");
+  }
+
+  const STOCK = `GREATEST(0,
+    COALESCE(i.cant_recepcionada, 0)
+    - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+    - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                JOIN dispensaciones d ON d.id = di.dispensacion_id
+                WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+    + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                WHERE a.item_id = i.id), 0))`;
+
+  const [rows] = await pool.query(
+    `SELECT i.id,
+            i.tipo_recepcion,
+            i.codigo_interno,
+            i.nombre,
+            i.concentracion,
+            i.presentacion_comercial,
+            i.lote,
+            i.fecha_vencimiento,
+            i.cant_recepcionada,
+            i.precio_unitario,
+            ${STOCK}                                          AS stock,
+            ${STOCK} * COALESCE(i.precio_unitario, 0)        AS valor_total,
+            r.fecha           AS fecha_recepcion,
+            r.proveedor,
+            r.remision_factura,
+            mu.nombre         AS municipio,
+            se.nombre         AS sede,
+            cat.forma_farmaceutica
+     FROM items_recepcion_inventario i
+     JOIN recepciones_inventario r  ON r.id  = i.recepcion_id
+     LEFT JOIN municipios mu        ON mu.id = r.municipio_id
+     LEFT JOIN sedes se             ON se.id = r.sede_id
+     LEFT JOIN catalogo_items cat   ON cat.id = i.catalogo_id
+     WHERE ${conds.join(' AND ')}
+     ORDER BY i.tipo_recepcion, i.nombre ASC`,
+    params,
+  );
+  return rows;
+};
+
 module.exports = {
   findAll,
   findAllItems,
@@ -933,4 +1017,5 @@ module.exports = {
   saveBorrador,
   deleteBorrador,
   getSalidasReporte,
+  getValorizadoReporte,
 };

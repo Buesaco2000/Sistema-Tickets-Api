@@ -155,6 +155,67 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
   } catch (err) { next(err); }
 });
 
+// ── Reporte valorizado ─────────────────────────────────────────────────────
+router.get('/valorizado/reporte', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const { formato = 'json', ...filters } = req.query;
+    const rows = await svc.getValorizadoReporte(
+      req.user.empresa_id, req.user.id, req.user.rol_id, req.user.cargo, filters,
+    );
+
+    if (formato === 'xlsx') {
+      const XLSX   = require('xlsx');
+      const LABELS = {
+        MEDICAMENTOS: 'Medicamentos', LABORATORIO: 'Laboratorio',
+        MEDICO_QUIRURGICO: 'Méd. Quirúrgico', ASEO_PAPELERIA: 'Aseo y Papelería',
+        ODONTOLOGIA: 'Odontología',
+      };
+      const fmtDate = (d) => d ? new Date(d).toLocaleDateString('es-CO') : '—';
+      const fmtCop  = (n) => n != null ? Number(n) : 0;
+
+      const data = rows.map((r, i) => ({
+        '#':                      i + 1,
+        'Categoría':              LABELS[r.tipo_recepcion] ?? r.tipo_recepcion,
+        'Código':                 r.codigo_interno ?? '—',
+        'Nombre':                 r.nombre,
+        'Concentración':          r.concentracion ?? '—',
+        'Presentación':           r.presentacion_comercial ?? '—',
+        'Lote':                   r.lote ?? '—',
+        'Vencimiento':            fmtDate(r.fecha_vencimiento),
+        'Fecha recepción':        fmtDate(r.fecha_recepcion),
+        'Proveedor':              r.proveedor ?? '—',
+        'N° Factura':             r.remision_factura ?? '—',
+        'Municipio':              r.municipio ?? '—',
+        'Sede':                   r.sede ?? '—',
+        'Cant. recepcionada':     Number(r.cant_recepcionada ?? 0),
+        'Stock actual':           Number(r.stock ?? 0),
+        'Precio unitario (COP)':  fmtCop(r.precio_unitario),
+        'Valor total (COP)':      fmtCop(r.valor_total),
+      }));
+
+      const wb  = XLSX.utils.book_new();
+      const ws  = XLSX.utils.json_to_sheet(data);
+      // Ajuste de ancho de columnas
+      ws['!cols'] = [
+        {wch:4},{wch:16},{wch:10},{wch:40},{wch:16},{wch:18},{wch:12},{wch:12},
+        {wch:14},{wch:24},{wch:14},{wch:14},{wch:14},{wch:16},{wch:12},{wch:20},{wch:18},
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventario Valorizado');
+      const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+      const fecha = new Date().toISOString().split('T')[0];
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="inventario_valorizado_${fecha}.xlsx"`);
+      return res.send(buf);
+    }
+
+    // JSON: agregar totales en la respuesta
+    const totalValor = rows.reduce((acc, r) => acc + Number(r.valor_total ?? 0), 0);
+    const sinPrecio  = rows.filter((r) => r.precio_unitario == null).length;
+    res.json({ success: true, data: { rows, totalValor, sinPrecio, total: rows.length } });
+  } catch (err) { next(err); }
+});
+
 router.get('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
     const data = await svc.findAll(req.user.empresa_id);
