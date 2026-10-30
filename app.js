@@ -159,6 +159,9 @@ v1.use("/conteos-fisicos",            require("./src/Modules/conteoFisico/conteo
 v1.use("/informes", require("./src/Modules/informes/informes.routes.js"));
 v1.use("/obligaciones", require("./src/Modules/informes/obligaciones/obligaciones.routes.js"));
 
+// DASHBOARD EJECUTIVO
+v1.use("/dashboard", require("./src/Modules/dashboard/dashboard.routes.js"));
+
 
 // CATÁLOGOS DE ITEMS (medicamentos, laboratorio, médico-quirúrgico, aseo y papelería)
 const crearCatalogoItemsRouter = require("./src/Modules/catalogoItems/catalogoItems.routes.js");
