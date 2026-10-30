@@ -50,7 +50,7 @@ const findAll = async (empresaId, filtros) => {
     SELECT 
         ei.id, ei.etiqueta_corte, ei.fecha_corte, ei.fecha_limite, ei.fecha_presentado, ei.numero_radicado,
         DATEDIFF(ei.fecha_limite, CURDATE()) AS dias_restantes, o.codigo, o.nombre  AS  informe,
-        er.nombre AS ente_rector, e.nombre AS estado, 
+        o.tipo_informe, er.nombre AS ente_rector, e.nombre AS estado,
         CONCAT(u.nombres, ' ', u.apellidos) AS responsable
     FROM ejecucion_informe ei JOIN obligacion o ON o.id = ei.obligacion_id 
     JOIN ente_rector er ON er.id = o.ente_rector_id

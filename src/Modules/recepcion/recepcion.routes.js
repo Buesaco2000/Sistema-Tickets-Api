@@ -93,9 +93,7 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
     const pool = require('../../Config/database');
     const eid  = req.user.empresa_id;
     const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo = req.user.rol_id === 1
-      || cargo.includes('almacen')
-      || cargo.includes('director tecnico');
+    const verTodo = req.user.rol_id === 1 || cargo.includes('almacen');
     const municipioId = !verTodo && req.user.municipio_id ? req.user.municipio_id : null;
     const munCond = municipioId ? ' AND r2.municipio_id = ?' : '';
 
@@ -161,7 +159,7 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
     const pool     = require('../../Config/database');
     const eid      = req.user.empresa_id;
     const cargo    = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo  = req.user.rol_id === 1 || cargo.includes('almacen') || cargo.includes('director tecnico');
+    const verTodo  = req.user.rol_id === 1 || cargo.includes('almacen');
     const munId    = !verTodo && req.user.municipio_id ? req.user.municipio_id : null;
     const munCond  = munId ? ' AND r.municipio_id = ?' : '';
     const params   = [eid, ...(munId ? [munId] : [])];

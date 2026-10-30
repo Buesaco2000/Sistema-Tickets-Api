@@ -3,7 +3,7 @@ const AppError = require("../../../Utils/AppError");
 
 const findAll = async (empresaId) => {
   const [rows] = await pool.query(
-    `SELECT o.id, o.codigo, o.nombre, o.soporte_normativo, o.detalle, o.dias_plazo, o.complejidad,
+    `SELECT o.id, o.codigo, o.nombre, o.soporte_normativo, o.tipo_informe, o.detalle, o.dias_plazo, o.complejidad,
             o.dias_anticipacion, o.area_elabora, o.area_presenta, o.responsable_id, o.suplente_id, o.activo,
 
             er.id AS ente_rector_id,
@@ -148,6 +148,7 @@ const create = async (empresaId, data, userId) => {
     periodicidad_id,
     nombre,
     soporte_normativo,
+    tipo_informe = 'NORMATIVO',
     detalle,
     dias_plazo,
     complejidad = 1,
@@ -170,6 +171,7 @@ const create = async (empresaId, data, userId) => {
             periodicidad_id,
             nombre,
             soporte_normativo,
+            tipo_informe,
             detalle,
             dias_plazo,
             complejidad,
@@ -182,7 +184,7 @@ const create = async (empresaId, data, userId) => {
             activo,
             created_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       empresaId,
@@ -192,6 +194,7 @@ const create = async (empresaId, data, userId) => {
       periodicidad_id,
       nombre,
       soporte_normativo,
+      tipo_informe || 'NORMATIVO',
       detalle || null,
       dias_plazo,
       complejidad,
@@ -219,6 +222,7 @@ const update = async (empresaId, id, data, userId) => {
     periodicidad_id,
     nombre,
     soporte_normativo,
+    tipo_informe,
     detalle,
     dias_plazo,
     complejidad,
@@ -241,6 +245,7 @@ const update = async (empresaId, id, data, userId) => {
             periodicidad_id = ?,
             nombre = ?,
             soporte_normativo = ?,
+            tipo_informe = ?,
             detalle = ?,
             dias_plazo = ?,
             complejidad = ?,
@@ -263,6 +268,7 @@ const update = async (empresaId, id, data, userId) => {
       periodicidad_id,
       nombre,
       soporte_normativo,
+      tipo_informe || 'NORMATIVO',
       detalle || null,
       dias_plazo,
       complejidad,

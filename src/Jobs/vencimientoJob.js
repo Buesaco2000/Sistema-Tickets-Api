@@ -28,6 +28,7 @@ async function runVencimientoJob() {
         `SELECT i.nombre, i.lote, i.tipo_recepcion,
                 i.fecha_vencimiento,
                 ${STOCK_CALC} AS stock,
+                r.municipio_id,
                 mu.nombre AS municipio,
                 CASE WHEN i.fecha_vencimiento < CURDATE() THEN 'VENCIDO' ELSE 'PROXIMO' END AS estado
          FROM items_recepcion_inventario i
@@ -46,17 +47,44 @@ async function runVencimientoJob() {
 
       if (items.length === 0) continue;
 
-      // Admins de esta empresa
+      // Admins de esta empresa — reciben todos los ítems de todos los municipios
       const [admins] = await pool.query(
-        `SELECT email FROM users
-         WHERE empresa_id = ? AND rol_id = 1 AND deleted_at IS NULL`,
+        `SELECT u.email, u.municipio_id
+         FROM users u
+         WHERE u.empresa_id = ? AND u.rol_id = 1 AND u.deleted_at IS NULL AND u.activo = 1`,
         [empresa_id],
       );
-      if (admins.length === 0) continue;
 
-      const emails = admins.map((a) => a.email);
-      await mailer.sendVencimientoAlert(emails, items);
-      logger.info(`vencimientoJob: empresa ${empresa_id} — ${items.length} ítems, ${emails.length} destinatarios`);
+      // Directores con municipio asignado — solo ven su municipio
+      const [directores] = await pool.query(
+        `SELECT u.email, u.municipio_id
+         FROM users u
+         JOIN cargos c ON c.id = u.cargo_id
+         WHERE u.empresa_id = ? AND u.rol_id != 1
+           AND u.municipio_id IS NOT NULL
+           AND u.deleted_at IS NULL AND u.activo = 1
+           AND (LOWER(c.nombre) LIKE '%director%' OR LOWER(c.nombre) LIKE '%cientifico%')`,
+        [empresa_id],
+      );
+
+      // Enviar a admins (todo)
+      if (admins.length > 0) {
+        const adminEmails = admins.map((a) => a.email);
+        await mailer.sendVencimientoAlert(adminEmails, items);
+        logger.info(`vencimientoJob: empresa ${empresa_id} — ${items.length} ítems → ${adminEmails.length} admin(s)`);
+      }
+
+      // Enviar a cada director solo los ítems de su municipio
+      for (const dir of directores) {
+        const itemsMunicipio = items.filter(i => {
+          // items lleva municipio como string, necesitamos comparar por municipio_id
+          // Hacemos un join a posteriori: ya tenemos municipio nombre en el item
+          return i.municipio_id === dir.municipio_id;
+        });
+        if (itemsMunicipio.length === 0) continue;
+        await mailer.sendVencimientoAlert([dir.email], itemsMunicipio);
+        logger.info(`vencimientoJob: empresa ${empresa_id} — ${itemsMunicipio.length} ítems → director ${dir.email}`);
+      }
     }
   } catch (err) {
     logger.error({ message: 'vencimientoJob error', error: err.message, stack: err.stack });

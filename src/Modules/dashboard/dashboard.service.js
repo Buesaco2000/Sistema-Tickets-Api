@@ -4,18 +4,18 @@ const ROLES = require('../../Utils/roles');
 // Determina si el usuario puede ver cada bloque y su municipio_id de filtro
 function resolveAcceso(user) {
   const c = (user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const isAdmin       = user.rol_id === ROLES.ADMIN;
-  const esDirector    = c.includes('director tecnico');
-  const esAlmacen     = c.includes('almacen');
-  const esCoordAdm    = c.includes('coordinador administrativo');
+  const isAdmin          = user.rol_id === ROLES.ADMIN;
+  const esDirector       = c.includes('director tecnico');
+  const esAlmacen        = c.includes('almacen');
+  const esCoordAdm       = c.includes('coordinador administrativo');
+  const esJefeArchivos   = c.includes('jefe archivo');
 
   const verInventario   = isAdmin || esDirector || esAlmacen;
-  const verCumplimiento = isAdmin || esCoordAdm;
+  const verCumplimiento = isAdmin || esCoordAdm || esJefeArchivos;
   const verTickets      = isAdmin;
 
-  // Almacén ve TODO el inventario sin filtro de municipio (igual que ADMIN para esos bloques)
-  // Solo el Director Técnico queda filtrado por su municipio
-  const municipioFiltro = (isAdmin || esAlmacen) ? null : (user.municipio_id ?? null);
+  // Almacén y Jefe de Archivo ven TODO sin filtro de municipio
+  const municipioFiltro = (isAdmin || esAlmacen || esJefeArchivos) ? null : (user.municipio_id ?? null);
 
   return { isAdmin, verInventario, verCumplimiento, verTickets, municipioFiltro };
 }
