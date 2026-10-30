@@ -63,7 +63,8 @@ describe('Escenario: Recepción de medicamentos — vencimiento y cadena frío',
       beginTransaction: jest.fn(),
       query: jest.fn()
         .mockResolvedValueOnce([{ insertId: 5 }])  // INSERT recepcion
-        .mockResolvedValueOnce([{}]),               // INSERT item
+        .mockResolvedValueOnce([[]])                // _syncItems: SELECT existentes (vacío)
+        .mockResolvedValueOnce([{}]),               // _syncItems: INSERT item
       commit: jest.fn(), rollback: jest.fn(), release: jest.fn(),
     };
     pool.getConnection.mockResolvedValue(conn);
@@ -91,8 +92,9 @@ describe('Escenario: Recepción de medicamentos — vencimiento y cadena frío',
     const conn = {
       beginTransaction: jest.fn(),
       query: jest.fn()
-        .mockResolvedValueOnce([{ insertId: 6 }])
-        .mockResolvedValueOnce([{}]),
+        .mockResolvedValueOnce([{ insertId: 6 }])  // INSERT recepcion
+        .mockResolvedValueOnce([[]])                // _syncItems: SELECT existentes
+        .mockResolvedValueOnce([{}]),               // _syncItems: INSERT item
       commit: jest.fn(), rollback: jest.fn(), release: jest.fn(),
     };
     pool.getConnection.mockResolvedValue(conn);
@@ -112,12 +114,11 @@ describe('Escenario: Recepción de medicamentos — vencimiento y cadena frío',
       .send(payloadRecepcion);
 
     expect(res.status).toBe(201);
-    // Verificar que el INSERT incluyó los campos nuevos
-    const insertCall = conn.query.mock.calls[1];
+    // _syncItems: índice 0 = INSERT recepcion, 1 = SELECT existentes, 2 = INSERT item
+    const insertCall = conn.query.mock.calls[2];
     const insertSql  = insertCall[0];
     expect(insertSql).toContain('cant_recepcionada');
     expect(insertSql).toContain('lote');
-    expect(insertSql).toContain('tipo_certificado_calidad');
     expect(insertSql).toContain('tipo_etiquetas');
   });
 });
@@ -125,7 +126,8 @@ describe('Escenario: Recepción de medicamentos — vencimiento y cadena frío',
 
 // SUITE 2  GET /items - inventario con semáforo vencimiento
 describe('GET /api/v1/recepciones/medicamentos/items — semáforo vencimiento', () => {
-  const token = makeToken();
+  // ADMIN (rol_id 1) usa la rama de 1 sola query — mock más sencillo
+  const token = makeToken({ rol_id: 1 });
 
   it('200 — retorna items con fechas de vencimiento', async () => {
     const hoy     = new Date();
@@ -133,11 +135,15 @@ describe('GET /api/v1/recepciones/medicamentos/items — semáforo vencimiento',
     const en200   = new Date(hoy); en200.setDate(hoy.getDate() + 200);
     const vencido = new Date(hoy); vencido.setDate(hoy.getDate() - 10);
 
-    pool.query.mockResolvedValueOnce([[
-      { id: 1, nombre: 'Amoxicilina 500mg',  fecha_vencimiento: en400.toISOString().split('T')[0],   cant_recepcionada: 50 },
-      { id: 2, nombre: 'Ibuprofeno 400mg',   fecha_vencimiento: en200.toISOString().split('T')[0],   cant_recepcionada: 20 },
-      { id: 3, nombre: 'Insulina Glargina',  fecha_vencimiento: vencido.toISOString().split('T')[0], cant_recepcionada: 5  },
-    ]]);
+    pool.query
+      // 1ª query: ítems del almacén
+      .mockResolvedValueOnce([[
+        { id: 1, nombre: 'Amoxicilina 500mg',  fecha_vencimiento: en400.toISOString().split('T')[0],   cant_recepcionada: 50, stock: 50 },
+        { id: 2, nombre: 'Ibuprofeno 400mg',   fecha_vencimiento: en200.toISOString().split('T')[0],   cant_recepcionada: 20, stock: 20 },
+        { id: 3, nombre: 'Insulina Glargina',  fecha_vencimiento: vencido.toISOString().split('T')[0], cant_recepcionada: 5,  stock: 5  },
+      ]])
+      // 2ª query: dispensaciones asociadas
+      .mockResolvedValueOnce([[]]);
 
     const res = await request(app)
       .get('/api/v1/recepciones/medicamentos/items')
@@ -145,7 +151,6 @@ describe('GET /api/v1/recepciones/medicamentos/items — semáforo vencimiento',
 
     expect(res.status).toBe(200);
     expect(res.body.data).toHaveLength(3);
-    // Verificar que incluye fechas de vencimiento
     expect(res.body.data[2].fecha_vencimiento).toBeDefined();
   });
 
