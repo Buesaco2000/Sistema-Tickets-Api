@@ -155,6 +155,52 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
   } catch (err) { next(err); }
 });
 
+// Listado individual de ítems vencidos/próximos — para campana in-app
+router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+  try {
+    const pool     = require('../../Config/database');
+    const eid      = req.user.empresa_id;
+    const cargo    = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const verTodo  = req.user.rol_id === 1 || cargo.includes('almacen') || cargo.includes('director tecnico');
+    const munId    = !verTodo && req.user.municipio_id ? req.user.municipio_id : null;
+    const munCond  = munId ? ' AND r.municipio_id = ?' : '';
+    const params   = [eid, ...(munId ? [munId] : [])];
+
+    const STOCK = `(
+      COALESCE(i.cant_recepcionada, 0)
+      - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                  WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+      - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                  JOIN dispensaciones d ON d.id = di.dispensacion_id
+                  WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+      + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                  WHERE a.item_id = i.id), 0)
+    )`;
+
+    const [rows] = await pool.query(`
+      SELECT i.nombre, i.lote, i.tipo_recepcion,
+             i.fecha_vencimiento,
+             DATEDIFF(i.fecha_vencimiento, CURDATE()) AS dias_restantes,
+             CAST(${STOCK} AS SIGNED)                 AS stock,
+             mu.nombre AS municipio,
+             CASE WHEN i.fecha_vencimiento < CURDATE() THEN 'VENCIDO' ELSE 'PROXIMO' END AS estado
+      FROM items_recepcion_inventario i
+      JOIN recepciones_inventario r ON r.id = i.recepcion_id
+      LEFT JOIN municipios mu ON mu.id = r.municipio_id
+      WHERE r.empresa_id = ?${munCond}
+        AND r.deleted_at IS NULL
+        AND r.estado = 'COMPLETADA'
+        AND i.fecha_vencimiento IS NOT NULL
+        AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+        AND ${STOCK} > 0
+      ORDER BY i.fecha_vencimiento ASC
+      LIMIT 20
+    `, params);
+
+    res.json({ success: true, data: rows });
+  } catch (err) { next(err); }
+});
+
 // ── Reporte valorizado ─────────────────────────────────────────────────────
 router.get('/valorizado/reporte', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
