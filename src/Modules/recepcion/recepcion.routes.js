@@ -40,6 +40,12 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
       scopeParam        = [req.user.id];
     }
 
+    // Auxiliar no ve MEDICAMENTOS ni MQ — aplicar en KPIs y categorías
+    const cargoResumen  = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const esPrivResumen = cargoResumen.includes('almacen') || cargoResumen.includes('director tecnico');
+    const esAuxResumen  = !esPrivResumen && cargoResumen.includes('auxiliar');
+    const catResumen    = esAuxResumen ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')" : '';
+
     const [[totales], [porCategoria], [recientes]] = await Promise.all([
       pool.query(`
         SELECT
@@ -53,13 +59,15 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
            WHERE r2.empresa_id = ? AND r2.deleted_at IS NULL
              AND r2.estado = 'COMPLETADA'${scopeCondR2}
              AND i.fecha_vencimiento IS NOT NULL
-             AND i.fecha_vencimiento < CURDATE()
+             AND i.fecha_vencimiento < CURDATE()${catResumen}
              AND (COALESCE(i.cant_recepcionada, 0)
                   - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
                               WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
                   - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
                               JOIN dispensaciones d ON d.id = di.dispensacion_id
                               WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+                  + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                              WHERE a.item_id = i.id), 0)
                  ) > 0
           )                            AS items_vencidos,
           (SELECT COUNT(*)
@@ -69,13 +77,15 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
              AND r2.estado = 'COMPLETADA'${scopeCondR2}
              AND i.fecha_vencimiento IS NOT NULL
              AND i.fecha_vencimiento >= CURDATE()
-             AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 123 DAY)
+             AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 123 DAY)${catResumen}
              AND (COALESCE(i.cant_recepcionada, 0)
                   - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
                               WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
                   - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
                               JOIN dispensaciones d ON d.id = di.dispensacion_id
                               WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+                  + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
+                              WHERE a.item_id = i.id), 0)
                  ) > 0
           )                            AS proximos_vencer
         FROM recepciones_inventario
@@ -86,7 +96,7 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
         SELECT i.tipo_recepcion AS categoria, COUNT(*) AS total
         FROM items_recepcion_inventario i
         JOIN recepciones_inventario r ON r.id = i.recepcion_id
-        WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'${scopeCondR}
+        WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'${scopeCondR}${catResumen}
         GROUP BY i.tipo_recepcion`, [eid, ...scopeParam]),
 
       pool.query(`
