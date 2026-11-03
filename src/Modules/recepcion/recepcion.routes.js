@@ -10,9 +10,20 @@ const SALUD_ADMIN_ING = [ROLES.ADMIN, ROLES.SALUD, ROLES.INGENIERO];
 
 router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
-    const pool       = require('../../Config/database');
-    const eid        = req.user.empresa_id;
-    const municipioId = req.query.municipio_id ? parseInt(req.query.municipio_id, 10) : null;
+    const pool  = require('../../Config/database');
+    const eid   = req.user.empresa_id;
+    const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const verTodo = req.user.rol_id === 1 || cargo.includes('almacen');
+
+    // Admin/almacén pueden filtrar por municipio vía query; los demás usan solo su propio municipio
+    const municipioId = verTodo
+      ? (req.query.municipio_id ? parseInt(req.query.municipio_id, 10) : null)
+      : (req.user.municipio_id ?? null);
+
+    // Usuario sin municipio asignado y sin acceso total → no tiene ítems propios
+    if (!verTodo && !municipioId) {
+      return res.json({ success: true, data: { total_recepciones: 0, completadas: 0, borradores: 0, pendientes: 0, vencidos: 0, por_vencer: 0, por_categoria: [], recientes: [] } });
+    }
 
     const munCond  = municipioId ? ' AND r.municipio_id = ?' : '';
     const munCond2 = municipioId ? ' AND municipio_id = ?'   : '';
@@ -94,7 +105,13 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
     const eid  = req.user.empresa_id;
     const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     const verTodo = req.user.rol_id === 1 || cargo.includes('almacen');
-    const municipioId = !verTodo && req.user.municipio_id ? req.user.municipio_id : null;
+    const municipioId = verTodo ? null : (req.user.municipio_id ?? null);
+
+    // Usuario sin municipio asignado y sin acceso total → no tiene ítems propios
+    if (!verTodo && !municipioId) {
+      return res.json({ success: true, data: { vencidos: 0, proximos_vencer: 0, por_categoria: {} } });
+    }
+
     const munCond = municipioId ? ' AND r2.municipio_id = ?' : '';
 
     const stockCalc = `(
@@ -160,7 +177,12 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
     const eid      = req.user.empresa_id;
     const cargo    = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
     const verTodo  = req.user.rol_id === 1 || cargo.includes('almacen');
-    const munId    = !verTodo && req.user.municipio_id ? req.user.municipio_id : null;
+    const munId    = verTodo ? null : (req.user.municipio_id ?? null);
+
+    if (!verTodo && !munId) {
+      return res.json({ success: true, data: [] });
+    }
+
     const munCond  = munId ? ' AND r.municipio_id = ?' : '';
     const params   = [eid, ...(munId ? [munId] : [])];
 
