@@ -112,6 +112,10 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
       return res.json({ success: true, data: { vencidos: 0, proximos_vencer: 0, por_categoria: {} } });
     }
 
+    const esPrivilegiado = cargo.includes('almacen') || cargo.includes('director tecnico');
+    const esAuxiliar = !esPrivilegiado && cargo.includes('auxiliar');
+    const catCond = esAuxiliar ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')" : '';
+
     const munCond = municipioId ? ' AND r2.municipio_id = ?' : '';
 
     const stockCalc = `(
@@ -145,7 +149,7 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
       JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
       WHERE r2.empresa_id = ?${munCond}
         AND r2.deleted_at IS NULL
-        AND r2.estado = 'COMPLETADA'
+        AND r2.estado = 'COMPLETADA'${catCond}
       GROUP BY i.tipo_recepcion
     `, base);
 
@@ -183,6 +187,11 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
       return res.json({ success: true, data: [] });
     }
 
+    const esPrivilegiado2 = cargo.includes('almacen') || cargo.includes('director tecnico');
+    const catCond2 = (!esPrivilegiado2 && cargo.includes('auxiliar'))
+      ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
+      : '';
+
     const munCond  = munId ? ' AND r.municipio_id = ?' : '';
     const params   = [eid, ...(munId ? [munId] : [])];
 
@@ -212,7 +221,7 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
         AND r.estado = 'COMPLETADA'
         AND i.fecha_vencimiento IS NOT NULL
         AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        AND ${STOCK} > 0
+        AND ${STOCK} > 0${catCond2}
       ORDER BY i.fecha_vencimiento ASC
       LIMIT 20
     `, params);
