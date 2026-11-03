@@ -8,7 +8,7 @@ function resolveAcceso(user) {
   const esDirector       = c.includes('director tecnico');
   const esAlmacen        = c.includes('almacen');
   const esCoordAdm       = c.includes('coordinador administrativo');
-  const esJefeArchivos   = c.includes('jefe archivo');
+  const esJefeArchivos   = c.includes('jefe') && c.includes('archivo');
 
   const verInventario   = isAdmin || esDirector || esAlmacen;
   const verCumplimiento = isAdmin || esCoordAdm || esJefeArchivos;
@@ -20,7 +20,7 @@ function resolveAcceso(user) {
   return { isAdmin, verInventario, verCumplimiento, verTickets, municipioFiltro };
 }
 
-// ─── BLOQUE INVENTARIO ───────────────────────────────────────────────────────
+//  BLOQUE INVENTARIO 
 async function getInventario(empresaId, municipioId) {
   const munCond  = municipioId ? ' AND r.municipio_id = ?' : '';
   const munParam = municipioId ? [municipioId] : [];
@@ -85,7 +85,7 @@ async function getInventario(empresaId, municipioId) {
   };
 }
 
-// ─── BLOQUE DISPENSACIONES ───────────────────────────────────────────────────
+//  BLOQUE DISPENSACIONES 
 async function getDispensaciones(empresaId, municipioId) {
   const munCond  = municipioId ? ' AND d.municipio_id = ?' : '';
   const munParam = municipioId ? [municipioId] : [];
@@ -138,7 +138,7 @@ async function getDispensaciones(empresaId, municipioId) {
   };
 }
 
-// ─── BLOQUE CUMPLIMIENTO ─────────────────────────────────────────────────────
+//  BLOQUE CUMPLIMIENTO 
 async function getCumplimiento(empresaId, municipioId) {
   const munCond  = municipioId ? ' AND u.municipio_id = ?' : '';
   const munParam = municipioId ? [municipioId] : [];
@@ -203,7 +203,7 @@ async function getCumplimiento(empresaId, municipioId) {
   };
 }
 
-// ─── BLOQUE TICKETS ──────────────────────────────────────────────────────────
+//  BLOQUE TICKETS  
 async function getTickets(empresaId) {
   // KPIs del mes actual
   const [[mes]] = await pool.query(`
@@ -256,7 +256,7 @@ async function getTickets(empresaId) {
   };
 }
 
-// ─── ENDPOINT PRINCIPAL ──────────────────────────────────────────────────────
+//  ENDPOINT PRINCIPAL 
 async function getEjecutivo(user) {
   const { verInventario, verCumplimiento, verTickets, municipioFiltro } = resolveAcceso(user);
 
