@@ -149,8 +149,6 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
       - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
                   JOIN dispensaciones d ON d.id = di.dispensacion_id
                   WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
-      + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
-                  WHERE a.item_id = i.id), 0)
     )`;
 
     const [rows] = await pool.query(`
@@ -228,8 +226,6 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
       - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
                   JOIN dispensaciones d ON d.id = di.dispensacion_id
                   WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
-      + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
-                  WHERE a.item_id = i.id), 0)
     )`;
 
     const [rows] = await pool.query(`
