@@ -13,21 +13,32 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
     const pool  = require('../../Config/database');
     const eid   = req.user.empresa_id;
     const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo = req.user.rol_id === 1 || cargo.includes('almacen');
+    const verTodo    = req.user.rol_id === 1 || cargo.includes('almacen');
+    const esDirector = cargo.includes('director tecnico');
 
-    // Admin/almacén pueden filtrar por municipio vía query; los demás usan solo su propio municipio
-    const municipioId = verTodo
-      ? (req.query.municipio_id ? parseInt(req.query.municipio_id, 10) : null)
-      : (req.user.municipio_id ?? null);
-
-    // Usuario sin municipio asignado y sin acceso total → no tiene ítems propios
-    if (!verTodo && !municipioId) {
-      return res.json({ success: true, data: { total_recepciones: 0, completadas: 0, borradores: 0, pendientes: 0, vencidos: 0, por_vencer: 0, por_categoria: [], recientes: [] } });
+    // Tres niveles de acceso
+    let scopeCondR, scopeCondR2, scopeCondNoAlias, scopeParam;
+    if (verTodo) {
+      // Admin/almacén: pueden filtrar opcionalmente por municipio
+      const mid = req.query.municipio_id ? parseInt(req.query.municipio_id, 10) : null;
+      scopeCondR        = mid ? ' AND r.municipio_id = ?'  : '';
+      scopeCondR2       = mid ? ' AND r2.municipio_id = ?' : '';
+      scopeCondNoAlias  = mid ? ' AND municipio_id = ?'    : '';
+      scopeParam        = mid ? [mid] : [];
+    } else if (esDirector) {
+      // Director: su municipio
+      if (!req.user.municipio_id) return res.json({ success: true, data: { total_recepciones: 0, completadas: 0, borradores: 0, pendientes: 0, items_vencidos: 0, proximos_vencer: 0, porCategoria: [], recientes: [] } });
+      scopeCondR        = ' AND r.municipio_id = ?';
+      scopeCondR2       = ' AND r2.municipio_id = ?';
+      scopeCondNoAlias  = ' AND municipio_id = ?';
+      scopeParam        = [req.user.municipio_id];
+    } else {
+      // Usuario regular: solo sus propias recepciones (responsable_recibe_id)
+      scopeCondR        = ' AND r.responsable_recibe_id = ?';
+      scopeCondR2       = ' AND r2.responsable_recibe_id = ?';
+      scopeCondNoAlias  = ' AND responsable_recibe_id = ?';
+      scopeParam        = [req.user.id];
     }
-
-    const munCond  = municipioId ? ' AND r.municipio_id = ?' : '';
-    const munCond2 = municipioId ? ' AND municipio_id = ?'   : '';
-    const munParam = municipioId ? [municipioId] : [];
 
     const [[totales], [porCategoria], [recientes]] = await Promise.all([
       pool.query(`
@@ -40,8 +51,7 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
            FROM items_recepcion_inventario i
            JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
            WHERE r2.empresa_id = ? AND r2.deleted_at IS NULL
-             AND r2.estado = 'COMPLETADA'
-             ${municipioId ? 'AND r2.municipio_id = ?' : ''}
+             AND r2.estado = 'COMPLETADA'${scopeCondR2}
              AND i.fecha_vencimiento IS NOT NULL
              AND i.fecha_vencimiento < CURDATE()
              AND (COALESCE(i.cant_recepcionada, 0)
@@ -56,8 +66,7 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
            FROM items_recepcion_inventario i
            JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
            WHERE r2.empresa_id = ? AND r2.deleted_at IS NULL
-             AND r2.estado = 'COMPLETADA'
-             ${municipioId ? 'AND r2.municipio_id = ?' : ''}
+             AND r2.estado = 'COMPLETADA'${scopeCondR2}
              AND i.fecha_vencimiento IS NOT NULL
              AND i.fecha_vencimiento >= CURDATE()
              AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 123 DAY)
@@ -70,15 +79,15 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
                  ) > 0
           )                            AS proximos_vencer
         FROM recepciones_inventario
-        WHERE empresa_id = ?${munCond2} AND deleted_at IS NULL`,
-        [eid, ...(municipioId ? [municipioId] : []), eid, ...(municipioId ? [municipioId] : []), eid, ...munParam]),
+        WHERE empresa_id = ? AND deleted_at IS NULL${scopeCondNoAlias}`,
+        [eid, ...scopeParam, eid, ...scopeParam, eid, ...scopeParam]),
 
       pool.query(`
         SELECT i.tipo_recepcion AS categoria, COUNT(*) AS total
         FROM items_recepcion_inventario i
         JOIN recepciones_inventario r ON r.id = i.recepcion_id
-        WHERE r.empresa_id = ?${munCond} AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
-        GROUP BY i.tipo_recepcion`, [eid, ...munParam]),
+        WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'${scopeCondR}
+        GROUP BY i.tipo_recepcion`, [eid, ...scopeParam]),
 
       pool.query(`
         SELECT r.id, r.municipio_id, m.nombre AS municipio, r.estado,
@@ -89,9 +98,9 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
         LEFT JOIN municipios m ON m.id = r.municipio_id
         LEFT JOIN users u ON u.id = r.created_by
         LEFT JOIN items_recepcion_inventario i ON i.recepcion_id = r.id
-        WHERE r.empresa_id = ?${munCond} AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
+        WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'${scopeCondR}
         GROUP BY r.id, m.nombre, r.estado, r.remision_factura, r.created_at, u.nombres, u.apellidos, r.municipio_id
-        ORDER BY r.created_at DESC LIMIT 6`, [eid, ...munParam]),
+        ORDER BY r.created_at DESC LIMIT 6`, [eid, ...scopeParam]),
     ]);
 
     res.json({ success: true, data: { ...totales[0], porCategoria, recientes } });
@@ -104,19 +113,24 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
     const pool = require('../../Config/database');
     const eid  = req.user.empresa_id;
     const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo = req.user.rol_id === 1 || cargo.includes('almacen');
-    const municipioId = verTodo ? null : (req.user.municipio_id ?? null);
+    const verTodo    = req.user.rol_id === 1 || cargo.includes('almacen');
+    const esDirector = cargo.includes('director tecnico');
+    const esAuxiliar = !verTodo && !esDirector && cargo.includes('auxiliar');
+    const catCond    = esAuxiliar ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')" : '';
 
-    // Usuario sin municipio asignado y sin acceso total → no tiene ítems propios
-    if (!verTodo && !municipioId) {
-      return res.json({ success: true, data: { vencidos: 0, proximos_vencer: 0, por_categoria: {} } });
+    // Tres niveles: admin/almacen → empresa, director → municipio, regular → solo sus recepciones
+    let scopeCond, base;
+    if (verTodo) {
+      scopeCond = '';
+      base = [eid];
+    } else if (esDirector) {
+      if (!req.user.municipio_id) return res.json({ success: true, data: { vencidos: 0, proximos_vencer: 0, por_categoria: {} } });
+      scopeCond = ' AND r2.municipio_id = ?';
+      base = [eid, req.user.municipio_id];
+    } else {
+      scopeCond = ' AND r2.responsable_recibe_id = ?';
+      base = [eid, req.user.id];
     }
-
-    const esPrivilegiado = cargo.includes('almacen') || cargo.includes('director tecnico');
-    const esAuxiliar = !esPrivilegiado && cargo.includes('auxiliar');
-    const catCond = esAuxiliar ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')" : '';
-
-    const munCond = municipioId ? ' AND r2.municipio_id = ?' : '';
 
     const stockCalc = `(
       COALESCE(i.cant_recepcionada, 0)
@@ -128,8 +142,6 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
       + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
                   WHERE a.item_id = i.id), 0)
     )`;
-
-    const base = [eid, ...(municipioId ? [municipioId] : [])];
 
     const [rows] = await pool.query(`
       SELECT
@@ -147,7 +159,7 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
         ), 0) AS proximos_vencer
       FROM items_recepcion_inventario i
       JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
-      WHERE r2.empresa_id = ?${munCond}
+      WHERE r2.empresa_id = ?${scopeCond}
         AND r2.deleted_at IS NULL
         AND r2.estado = 'COMPLETADA'${catCond}
       GROUP BY i.tipo_recepcion
@@ -180,20 +192,24 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
     const pool     = require('../../Config/database');
     const eid      = req.user.empresa_id;
     const cargo    = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo  = req.user.rol_id === 1 || cargo.includes('almacen');
-    const munId    = verTodo ? null : (req.user.municipio_id ?? null);
-
-    if (!verTodo && !munId) {
-      return res.json({ success: true, data: [] });
-    }
-
-    const esPrivilegiado2 = cargo.includes('almacen') || cargo.includes('director tecnico');
-    const catCond2 = (!esPrivilegiado2 && cargo.includes('auxiliar'))
+    const verTodo2    = req.user.rol_id === 1 || cargo.includes('almacen');
+    const esDirector2 = cargo.includes('director tecnico');
+    const catCond2    = (!verTodo2 && !esDirector2 && cargo.includes('auxiliar'))
       ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
       : '';
 
-    const munCond  = munId ? ' AND r.municipio_id = ?' : '';
-    const params   = [eid, ...(munId ? [munId] : [])];
+    let scopeCond2, params;
+    if (verTodo2) {
+      scopeCond2 = '';
+      params = [eid];
+    } else if (esDirector2) {
+      if (!req.user.municipio_id) return res.json({ success: true, data: [] });
+      scopeCond2 = ' AND r.municipio_id = ?';
+      params = [eid, req.user.municipio_id];
+    } else {
+      scopeCond2 = ' AND r.responsable_recibe_id = ?';
+      params = [eid, req.user.id];
+    }
 
     const STOCK = `(
       COALESCE(i.cant_recepcionada, 0)
@@ -216,7 +232,7 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
       FROM items_recepcion_inventario i
       JOIN recepciones_inventario r ON r.id = i.recepcion_id
       LEFT JOIN municipios mu ON mu.id = r.municipio_id
-      WHERE r.empresa_id = ?${munCond}
+      WHERE r.empresa_id = ?${scopeCond2}
         AND r.deleted_at IS NULL
         AND r.estado = 'COMPLETADA'
         AND i.fecha_vencimiento IS NOT NULL
