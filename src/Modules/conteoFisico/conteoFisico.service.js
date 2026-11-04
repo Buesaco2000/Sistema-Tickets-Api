@@ -13,7 +13,7 @@ const STOCK_CALC = `GREATEST(0,
 
 const listar = async (empresaId) => {
   const [rows] = await pool.query(`
-    SELECT cf.id, cf.fecha, cf.estado, cf.observaciones, cf.created_at,
+    SELECT cf.id, cf.fecha, cf.estado, cf.observaciones, cf.created_at, cf.closed_at,
            mu.nombre AS municipio, s.nombre AS sede,
            COUNT(ci.id)                                                  AS total_items,
            COALESCE(SUM(ci.estado = 'PENDIENTE'), 0)                     AS pendientes,
@@ -96,7 +96,8 @@ const getById = async (id, empresaId) => {
     SELECT ci.id, ci.item_id, ci.stock_sistema, ci.cantidad_contada,
            (ci.cantidad_contada - ci.stock_sistema) AS diferencia,
            ci.estado, ci.observacion,
-           i.nombre, i.tipo_recepcion, i.lote, i.codigo_interno,
+           i.nombre, i.tipo_recepcion, i.lote, i.codigo_interno, i.fecha_vencimiento,
+           i.presentacion_comercial, i.concentracion, r.proveedor,
            mu2.nombre AS municipio_item, s2.nombre AS sede_item
     FROM conteo_items ci
     JOIN items_recepcion_inventario i ON i.id = ci.item_id

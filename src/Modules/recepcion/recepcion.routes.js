@@ -100,7 +100,7 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
         GROUP BY i.tipo_recepcion`, [eid, ...scopeParam]),
 
       pool.query(`
-        SELECT r.id, r.municipio_id, m.nombre AS municipio, r.estado,
+        SELECT r.id, r.consecutivo, r.municipio_id, m.nombre AS municipio, r.estado,
                r.remision_factura,
                r.created_at, CONCAT(u.nombres,' ',u.apellidos) AS creado_por,
                COUNT(i.id) AS total_items
@@ -109,7 +109,7 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
         LEFT JOIN users u ON u.id = r.created_by
         LEFT JOIN items_recepcion_inventario i ON i.recepcion_id = r.id
         WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'${scopeCondR}
-        GROUP BY r.id, m.nombre, r.estado, r.remision_factura, r.created_at, u.nombres, u.apellidos, r.municipio_id
+        GROUP BY r.id, r.consecutivo, m.nombre, r.estado, r.remision_factura, r.created_at, u.nombres, u.apellidos, r.municipio_id
         ORDER BY r.created_at DESC LIMIT 6`, [eid, ...scopeParam]),
     ]);
 
@@ -128,50 +128,77 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
     const esAuxiliar = !verTodo && !esDirector && cargo.includes('auxiliar');
     const catCond    = esAuxiliar ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')" : '';
 
-    // Tres niveles: admin/almacen → empresa, director → municipio, regular → solo sus recepciones
-    let scopeCond, base;
-    if (verTodo) {
-      scopeCond = '';
-      base = [eid];
-    } else if (esDirector) {
-      if (!req.user.municipio_id) return res.json({ success: true, data: { vencidos: 0, proximos_vencer: 0, por_categoria: {} } });
-      scopeCond = ' AND r2.municipio_id = ?';
-      base = [eid, req.user.municipio_id];
+    let rows;
+    if (verTodo || esDirector) {
+      // Admin/almacén → empresa entera; Director → su municipio
+      if (esDirector && !req.user.municipio_id) return res.json({ success: true, data: { vencidos: 0, proximos_vencer: 0, por_categoria: {} } });
+      const scopeCond = verTodo ? '' : ' AND r2.municipio_id = ?';
+      const base      = verTodo ? [eid] : [eid, req.user.municipio_id];
+      const stockCalc = `(
+        COALESCE(i.cant_recepcionada, 0)
+        - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                    WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+        - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                    JOIN dispensaciones d ON d.id = di.dispensacion_id
+                    WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+      )`;
+      [rows] = await pool.query(`
+        SELECT
+          i.tipo_recepcion,
+          COALESCE(SUM(
+            i.fecha_vencimiento IS NOT NULL
+            AND i.fecha_vencimiento < CURDATE()
+            AND ${stockCalc} > 0
+          ), 0) AS vencidos,
+          COALESCE(SUM(
+            i.fecha_vencimiento IS NOT NULL
+            AND i.fecha_vencimiento >= CURDATE()
+            AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+            AND ${stockCalc} > 0
+          ), 0) AS proximos_vencer
+        FROM items_recepcion_inventario i
+        JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
+        WHERE r2.empresa_id = ?${scopeCond}
+          AND r2.deleted_at IS NULL
+          AND r2.estado = 'COMPLETADA'${catCond}
+        GROUP BY i.tipo_recepcion
+      `, base);
     } else {
-      scopeCond = ' AND r2.responsable_recibe_id = ?';
-      base = [eid, req.user.id];
+      // Usuario regular: recepciones donde es responsable + ítems que le dispensaron
+      [rows] = await pool.query(`
+        WITH mis_items AS (
+          SELECT i.id, i.tipo_recepcion, i.fecha_vencimiento,
+            GREATEST(0,
+              COALESCE(i.cant_recepcionada, 0)
+              - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+              - COALESCE((SELECT SUM(dii.cantidad) FROM dispensacion_items dii
+                          JOIN dispensaciones dd ON dd.id = dii.dispensacion_id
+                          WHERE dii.item_id = i.id AND dd.estado != 'RECHAZADO'), 0)
+            ) AS stock
+          FROM items_recepcion_inventario i
+          JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
+          WHERE r2.empresa_id = ? AND r2.responsable_recibe_id = ?
+            AND r2.deleted_at IS NULL AND r2.estado = 'COMPLETADA'${catCond}
+          UNION ALL
+          SELECT i.id, i.tipo_recepcion, i.fecha_vencimiento,
+            GREATEST(0,
+              di.cantidad
+              - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.dispensacion_item_id = di.id AND s.estado != 'RECHAZADO'), 0)
+            ) AS stock
+          FROM dispensacion_items di
+          JOIN dispensaciones d ON d.id = di.dispensacion_id
+          JOIN items_recepcion_inventario i ON i.id = di.item_id
+          WHERE d.empresa_id = ? AND d.destinatario_id = ? AND d.estado = 'ACEPTADO'${catCond}
+        )
+        SELECT tipo_recepcion,
+          COUNT(DISTINCT CASE WHEN fecha_vencimiento IS NOT NULL AND fecha_vencimiento < CURDATE() AND stock > 0 THEN id END) AS vencidos,
+          COUNT(DISTINCT CASE WHEN fecha_vencimiento IS NOT NULL AND fecha_vencimiento >= CURDATE() AND fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND stock > 0 THEN id END) AS proximos_vencer
+        FROM mis_items
+        GROUP BY tipo_recepcion
+      `, [eid, req.user.id, eid, req.user.id]);
     }
-
-    const stockCalc = `(
-      COALESCE(i.cant_recepcionada, 0)
-      - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
-                  WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
-      - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
-                  JOIN dispensaciones d ON d.id = di.dispensacion_id
-                  WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
-    )`;
-
-    const [rows] = await pool.query(`
-      SELECT
-        i.tipo_recepcion,
-        COALESCE(SUM(
-          i.fecha_vencimiento IS NOT NULL
-          AND i.fecha_vencimiento < CURDATE()
-          AND ${stockCalc} > 0
-        ), 0) AS vencidos,
-        COALESCE(SUM(
-          i.fecha_vencimiento IS NOT NULL
-          AND i.fecha_vencimiento >= CURDATE()
-          AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-          AND ${stockCalc} > 0
-        ), 0) AS proximos_vencer
-      FROM items_recepcion_inventario i
-      JOIN recepciones_inventario r2 ON r2.id = i.recepcion_id
-      WHERE r2.empresa_id = ?${scopeCond}
-        AND r2.deleted_at IS NULL
-        AND r2.estado = 'COMPLETADA'${catCond}
-      GROUP BY i.tipo_recepcion
-    `, base);
 
     // Totales globales + desglose por categoría
     let totalVencidos = 0, totalProximos = 0;
@@ -206,47 +233,92 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
       ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
       : '';
 
-    let scopeCond2, params;
-    if (verTodo2) {
-      scopeCond2 = '';
-      params = [eid];
-    } else if (esDirector2) {
-      if (!req.user.municipio_id) return res.json({ success: true, data: [] });
-      scopeCond2 = ' AND r.municipio_id = ?';
-      params = [eid, req.user.municipio_id];
+    let rows;
+    if (verTodo2 || esDirector2) {
+      if (esDirector2 && !req.user.municipio_id) return res.json({ success: true, data: [] });
+      const scopeCond2 = verTodo2 ? '' : ' AND r.municipio_id = ?';
+      const params     = verTodo2 ? [eid] : [eid, req.user.municipio_id];
+      const STOCK = `(
+        COALESCE(i.cant_recepcionada, 0)
+        - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                    WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+        - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
+                    JOIN dispensaciones d ON d.id = di.dispensacion_id
+                    WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
+      )`;
+      [rows] = await pool.query(`
+        SELECT i.nombre, i.lote, i.tipo_recepcion,
+               i.fecha_vencimiento,
+               DATEDIFF(i.fecha_vencimiento, CURDATE()) AS dias_restantes,
+               CAST(${STOCK} AS SIGNED)                 AS stock,
+               mu.nombre AS municipio,
+               CASE WHEN i.fecha_vencimiento < CURDATE() THEN 'VENCIDO' ELSE 'PROXIMO' END AS estado
+        FROM items_recepcion_inventario i
+        JOIN recepciones_inventario r ON r.id = i.recepcion_id
+        LEFT JOIN municipios mu ON mu.id = r.municipio_id
+        WHERE r.empresa_id = ?${scopeCond2}
+          AND r.deleted_at IS NULL
+          AND r.estado = 'COMPLETADA'
+          AND i.fecha_vencimiento IS NOT NULL
+          AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+          AND ${STOCK} > 0${catCond2}
+        ORDER BY i.fecha_vencimiento ASC
+        LIMIT 20
+      `, params);
     } else {
-      scopeCond2 = ' AND r.responsable_recibe_id = ?';
-      params = [eid, req.user.id];
+      // Usuario regular: recepciones (responsable) + ítems dispensados a él
+      [rows] = await pool.query(`
+        WITH mis_items AS (
+          SELECT i.id, i.nombre, i.lote, i.tipo_recepcion, i.fecha_vencimiento,
+            mu.nombre AS municipio,
+            GREATEST(0,
+              COALESCE(i.cant_recepcionada, 0)
+              - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
+              - COALESCE((SELECT SUM(dii.cantidad) FROM dispensacion_items dii
+                          JOIN dispensaciones dd ON dd.id = dii.dispensacion_id
+                          WHERE dii.item_id = i.id AND dd.estado != 'RECHAZADO'), 0)
+            ) AS stock
+          FROM items_recepcion_inventario i
+          JOIN recepciones_inventario r ON r.id = i.recepcion_id
+          LEFT JOIN municipios mu ON mu.id = r.municipio_id
+          WHERE r.empresa_id = ? AND r.responsable_recibe_id = ?
+            AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'
+            AND i.fecha_vencimiento IS NOT NULL
+            AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)${catCond2}
+          UNION ALL
+          SELECT i.id, i.nombre, i.lote, i.tipo_recepcion, i.fecha_vencimiento,
+            mu.nombre AS municipio,
+            GREATEST(0,
+              di.cantidad
+              - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
+                          WHERE s.dispensacion_item_id = di.id AND s.estado != 'RECHAZADO'), 0)
+            ) AS stock
+          FROM dispensacion_items di
+          JOIN dispensaciones d ON d.id = di.dispensacion_id
+          JOIN items_recepcion_inventario i ON i.id = di.item_id
+          LEFT JOIN recepciones_inventario r ON r.id = i.recepcion_id
+          LEFT JOIN municipios mu ON mu.id = r.municipio_id
+          WHERE d.empresa_id = ? AND d.destinatario_id = ? AND d.estado = 'ACEPTADO'
+            AND i.fecha_vencimiento IS NOT NULL
+            AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)${catCond2}
+        ),
+        deduped AS (
+          SELECT id, nombre, lote, tipo_recepcion, fecha_vencimiento, municipio, MAX(stock) AS stock
+          FROM mis_items
+          GROUP BY id, nombre, lote, tipo_recepcion, fecha_vencimiento, municipio
+        )
+        SELECT nombre, lote, tipo_recepcion, fecha_vencimiento,
+          DATEDIFF(fecha_vencimiento, CURDATE()) AS dias_restantes,
+          CAST(stock AS SIGNED) AS stock,
+          municipio,
+          CASE WHEN fecha_vencimiento < CURDATE() THEN 'VENCIDO' ELSE 'PROXIMO' END AS estado
+        FROM deduped
+        WHERE stock > 0
+        ORDER BY fecha_vencimiento ASC
+        LIMIT 20
+      `, [eid, req.user.id, eid, req.user.id]);
     }
-
-    const STOCK = `(
-      COALESCE(i.cant_recepcionada, 0)
-      - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
-                  WHERE s.item_id = i.id AND s.estado != 'RECHAZADO'), 0)
-      - COALESCE((SELECT SUM(di.cantidad) FROM dispensacion_items di
-                  JOIN dispensaciones d ON d.id = di.dispensacion_id
-                  WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
-    )`;
-
-    const [rows] = await pool.query(`
-      SELECT i.nombre, i.lote, i.tipo_recepcion,
-             i.fecha_vencimiento,
-             DATEDIFF(i.fecha_vencimiento, CURDATE()) AS dias_restantes,
-             CAST(${STOCK} AS SIGNED)                 AS stock,
-             mu.nombre AS municipio,
-             CASE WHEN i.fecha_vencimiento < CURDATE() THEN 'VENCIDO' ELSE 'PROXIMO' END AS estado
-      FROM items_recepcion_inventario i
-      JOIN recepciones_inventario r ON r.id = i.recepcion_id
-      LEFT JOIN municipios mu ON mu.id = r.municipio_id
-      WHERE r.empresa_id = ?${scopeCond2}
-        AND r.deleted_at IS NULL
-        AND r.estado = 'COMPLETADA'
-        AND i.fecha_vencimiento IS NOT NULL
-        AND i.fecha_vencimiento < DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        AND ${STOCK} > 0${catCond2}
-      ORDER BY i.fecha_vencimiento ASC
-      LIMIT 20
-    `, params);
 
     res.json({ success: true, data: rows });
   } catch (err) { next(err); }

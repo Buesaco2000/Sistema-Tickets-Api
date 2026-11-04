@@ -30,7 +30,7 @@ const findById = async (id, empresaId) => {
 // Solo retorna recepciones COMPLETADAS (borradores no aparecen en el listado)
 const findAll = async (empresaId) => {
   const [rows] = await pool.query(
-    `SELECT r.id, r.fecha, r.hora, r.proveedor, r.remision_factura, r.responsable_recibe, r.created_at, 
+    `SELECT r.id, r.consecutivo, r.fecha, r.hora, r.proveedor, r.remision_factura, r.responsable_recibe, r.created_at,
     mu.nombre AS municipio, s.nombre AS sede FROM recepciones_inventario r
     LEFT JOIN municipios mu ON mu.id = r.municipio_id
     LEFT JOIN sedes      s  ON s.id  = r.sede_id
@@ -297,13 +297,29 @@ const create = async (data, userId, empresaId) => {
   try {
     await conn.beginTransaction();
 
+    // Generar consecutivo con SELECT ... FOR UPDATE para evitar duplicados concurrentes
+    const anio = new Date().getFullYear();
+    await conn.query(
+      `INSERT INTO secuencias (empresa_id, anio, ultimo_valor)
+       VALUES (?, ?, 1)
+       ON DUPLICATE KEY UPDATE ultimo_valor = ultimo_valor + 1`,
+      [empresaId, anio],
+    );
+    const [[{ val }]] = await conn.query(
+      `SELECT ultimo_valor AS val FROM secuencias
+       WHERE empresa_id = ? AND anio = ? FOR UPDATE`,
+      [empresaId, anio],
+    );
+    const consecutivo = `REC-${anio}-${String(val).padStart(4, "0")}`;
+
     const [result] = await conn.query(
       `INSERT INTO recepciones_inventario
-         (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
+         (empresa_id, consecutivo, fecha, hora, municipio_id, sede_id, uas, proveedor,
           remision_factura, reactivos, responsable_recibe, responsable_recibe_id, estado, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId,
+        consecutivo,
         fechaRecepcion,
         hora,
         municipio_id || null,
