@@ -6,10 +6,12 @@ const findById = async (id, empresaId) => {
   const [[row]] = await pool.query(
     `SELECT r.*,
             mu.nombre AS municipio,
-            s.nombre  AS sede
+            s.nombre  AS sede,
+            rp.consecutivo AS consecutivo_padre
      FROM recepciones_inventario r
      LEFT JOIN municipios mu ON mu.id = r.municipio_id
      LEFT JOIN sedes      s  ON s.id  = r.sede_id
+     LEFT JOIN recepciones_inventario rp ON rp.id = r.recepcion_padre_id
      WHERE r.id = ? AND r.empresa_id = ? AND r.deleted_at IS NULL`,
     [id, empresaId],
   );
@@ -177,6 +179,7 @@ const saveBorrador = async (data, userId, empresaId) => {
     reactivos,
     responsable_recibe,
     responsable_recibe_id,
+    recepcion_padre_id,
     medicamentos,
     borradorId,
   } = data;
@@ -208,7 +211,8 @@ const saveBorrador = async (data, userId, empresaId) => {
         `UPDATE recepciones_inventario SET
            fecha = ?, hora = ?, municipio_id = ?, sede_id = ?, uas = ?,
            proveedor = ?, remision_factura = ?, reactivos = ?,
-           responsable_recibe = ?, responsable_recibe_id = ?
+           responsable_recibe = ?, responsable_recibe_id = ?,
+           recepcion_padre_id = ?
          WHERE id = ?`,
         [
           fechaRecepcion,
@@ -221,6 +225,7 @@ const saveBorrador = async (data, userId, empresaId) => {
           reactivos || null,
           responsable_recibe,
           responsable_recibe_id || null,
+          recepcion_padre_id || null,
           recepcionId,
         ],
       );
@@ -229,8 +234,9 @@ const saveBorrador = async (data, userId, empresaId) => {
       const [result] = await conn.query(
         `INSERT INTO recepciones_inventario
            (empresa_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
-            remision_factura, reactivos, responsable_recibe, responsable_recibe_id, estado, created_by)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            remision_factura, reactivos, responsable_recibe, responsable_recibe_id,
+            recepcion_padre_id, estado, created_by)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [
           empresaId,
           fechaRecepcion,
@@ -243,6 +249,7 @@ const saveBorrador = async (data, userId, empresaId) => {
           reactivos || null,
           responsable_recibe,
           responsable_recibe_id || null,
+          recepcion_padre_id || null,
           "BORRADOR",
           userId,
         ],
@@ -275,6 +282,7 @@ const deleteBorrador = async (id, userId, empresaId) => {
 const create = async (data, userId, empresaId) => {
   const {
     tipo_recepcion,
+    recepcion_padre_id,
     fecha,
     hora,
     municipio_id,
@@ -314,12 +322,13 @@ const create = async (data, userId, empresaId) => {
 
     const [result] = await conn.query(
       `INSERT INTO recepciones_inventario
-         (empresa_id, consecutivo, fecha, hora, municipio_id, sede_id, uas, proveedor,
+         (empresa_id, consecutivo, recepcion_padre_id, fecha, hora, municipio_id, sede_id, uas, proveedor,
           remision_factura, reactivos, responsable_recibe, responsable_recibe_id, estado, created_by)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         empresaId,
         consecutivo,
+        recepcion_padre_id || null,
         fechaRecepcion,
         hora,
         municipio_id || null,

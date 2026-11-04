@@ -184,4 +184,57 @@ const cerrar = async (id, crearAjustes, userId, empresaId) => {
   return { ajustes_creados: ajustesCreados };
 };
 
-module.exports = { listar, crear, getById, actualizarItems, cerrar };
+// ── Hallazgos ──────────────────────────────────────────────────────────────
+
+const getHallazgos = async (conteoId, empresaId) => {
+  const [[conteo]] = await pool.query(
+    `SELECT id FROM conteos_fisicos WHERE id = ? AND empresa_id = ?`,
+    [conteoId, empresaId],
+  );
+  if (!conteo) throw new AppError('Conteo no encontrado.', 404);
+
+  const [rows] = await pool.query(
+    `SELECT id, tipo_recepcion, nombre, lote, fecha_vencimiento, cantidad, observacion, created_at
+     FROM conteo_hallazgos WHERE conteo_id = ? ORDER BY created_at ASC`,
+    [conteoId],
+  );
+  return rows;
+};
+
+const agregarHallazgo = async (conteoId, data, empresaId) => {
+  const [[conteo]] = await pool.query(
+    `SELECT id, estado FROM conteos_fisicos WHERE id = ? AND empresa_id = ?`,
+    [conteoId, empresaId],
+  );
+  if (!conteo)                     throw new AppError('Conteo no encontrado.', 404);
+  if (conteo.estado === 'CERRADO') throw new AppError('No se puede modificar un conteo cerrado.', 400);
+
+  const { tipo_recepcion, nombre, lote, fecha_vencimiento, cantidad, observacion } = data;
+  if (!nombre?.trim()) throw new AppError('El nombre es obligatorio.', 400);
+  if (!cantidad || cantidad < 0) throw new AppError('La cantidad debe ser mayor a 0.', 400);
+
+  const [result] = await pool.query(
+    `INSERT INTO conteo_hallazgos (conteo_id, tipo_recepcion, nombre, lote, fecha_vencimiento, cantidad, observacion)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [conteoId, tipo_recepcion || 'MEDICAMENTOS', nombre.trim(), lote || null,
+     fecha_vencimiento || null, Number(cantidad), observacion || null],
+  );
+  return { id: result.insertId };
+};
+
+const eliminarHallazgo = async (conteoId, hallazgoId, empresaId) => {
+  const [[conteo]] = await pool.query(
+    `SELECT id, estado FROM conteos_fisicos WHERE id = ? AND empresa_id = ?`,
+    [conteoId, empresaId],
+  );
+  if (!conteo)                     throw new AppError('Conteo no encontrado.', 404);
+  if (conteo.estado === 'CERRADO') throw new AppError('No se puede modificar un conteo cerrado.', 400);
+
+  const [result] = await pool.query(
+    `DELETE FROM conteo_hallazgos WHERE id = ? AND conteo_id = ?`,
+    [hallazgoId, conteoId],
+  );
+  if (!result.affectedRows) throw new AppError('Hallazgo no encontrado.', 404);
+};
+
+module.exports = { listar, crear, getById, actualizarItems, cerrar, getHallazgos, agregarHallazgo, eliminarHallazgo };

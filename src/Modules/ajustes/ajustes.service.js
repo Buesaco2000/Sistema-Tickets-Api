@@ -41,9 +41,12 @@ const create = async ({ item_id, cantidad, concepto, motivo }, userId, empresaId
   if (!item) throw new AppError('Ítem no encontrado.', 404);
 
   // Si el ajuste es negativo, validar que no deje stock en negativo
-  if (cantidad < 0 && item.stock_actual + cantidad < 0) {
+  const stockActual = Number(item.stock_actual);
+  const cantNum2    = Number(cantidad);
+
+  if (cantNum2 < 0 && stockActual + cantNum2 < 0) {
     throw new AppError(
-      `Stock insuficiente para este ajuste. Stock actual: ${item.stock_actual}`,
+      `Stock insuficiente para este ajuste. Stock actual: ${stockActual}`,
       400,
     );
   }
@@ -51,10 +54,10 @@ const create = async ({ item_id, cantidad, concepto, motivo }, userId, empresaId
   const [result] = await pool.query(
     `INSERT INTO ajustes_inventario (empresa_id, item_id, cantidad, concepto, motivo, creado_por)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [empresaId, item_id, cantidad, concepto, motivo.trim(), userId],
+    [empresaId, item_id, cantNum2, concepto, motivo.trim(), userId],
   );
 
-  return { id: result.insertId, stock_nuevo: item.stock_actual + cantidad };
+  return { id: result.insertId, stock_nuevo: stockActual + cantNum2 };
 };
 
 const findByItem = async (itemId, empresaId) => {

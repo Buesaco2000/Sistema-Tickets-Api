@@ -53,6 +53,31 @@ router.post('/:id/cerrar', authorize(...ADMIN_SALUD), async (req, res, next) => 
   } catch (e) { next(e); }
 });
 
+// ── Hallazgos ──────────────────────────────────────────────────────────────
+
+router.get('/:id/hallazgos', authorize(...ADMIN_SALUD), async (req, res, next) => {
+  try {
+    const data = await svc.getHallazgos(Number(req.params.id), req.user.empresa_id);
+    res.json({ success: true, data });
+  } catch (e) { next(e); }
+});
+
+router.post('/:id/hallazgos', authorize(...ADMIN_SALUD), async (req, res, next) => {
+  try {
+    if (!esPrivilegiado(req.user)) throw new AppError('Solo ADMIN o Almacén puede registrar hallazgos.', 403);
+    const data = await svc.agregarHallazgo(Number(req.params.id), req.body, req.user.empresa_id);
+    res.status(201).json({ success: true, data });
+  } catch (e) { next(e); }
+});
+
+router.delete('/:id/hallazgos/:hallazgoId', authorize(...ADMIN_SALUD), async (req, res, next) => {
+  try {
+    if (!esPrivilegiado(req.user)) throw new AppError('Solo ADMIN o Almacén puede eliminar hallazgos.', 403);
+    await svc.eliminarHallazgo(Number(req.params.id), Number(req.params.hallazgoId), req.user.empresa_id);
+    res.json({ success: true });
+  } catch (e) { next(e); }
+});
+
 router.get('/:id/reporte', authorize(...ADMIN_SALUD), async (req, res, next) => {
   try {
     const conteo  = await svc.getById(Number(req.params.id), req.user.empresa_id);
