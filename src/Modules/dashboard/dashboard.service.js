@@ -5,8 +5,8 @@ const ROLES = require('../../Utils/roles');
 function resolveAcceso(user) {
   const c = (user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
   const isAdmin          = user.rol_id === ROLES.ADMIN;
-  const esDirector       = c.includes('director tecnico');
-  const esAlmacen        = c.includes('almacen');
+  const esDirector       = !!user.es_director_tecnico;
+  const esAlmacen        = !!user.es_almacen;
   const esCoordAdm       = c.includes('coordinador administrativo');
   const esJefeArchivos   = c.includes('jefe') && c.includes('archivo');
 

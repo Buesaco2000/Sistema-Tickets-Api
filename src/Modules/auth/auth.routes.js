@@ -42,7 +42,7 @@ const registerPublicSchema = z.object({
     email:        z.string().email(),
     password:     z.string().min(8, 'Mínimo 8 caracteres.').max(100),
     empresa_id:   z.number().int().positive(),
-    rol_id:       z.number().int().min(2).max(4).optional().nullable(), // 2=INGENIERO 3=SALUD 4=ARCHIVOS (no ADMIN)
+    // rol_id eliminado del registro publico - siempre se asigna ROLES.SALUD en el service
     cargo_id:     z.number().int().positive().optional().nullable(),
     municipio_id: z.number().int().positive().optional().nullable(),
     sede_id:      z.number().int().positive().optional().nullable(),

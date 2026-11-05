@@ -2,7 +2,9 @@ const router = require('express').Router();
 const svc    = require('./recepcion.service');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
+const validate         = require('../../Middlewares/validate.middleware');
 const ROLES            = require('../../Utils/roles');
+const { createSchema, borradorSchema, salidaSchema } = require('./recepcion.schema');
 
 router.use(authenticate);
 
@@ -12,9 +14,8 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
   try {
     const pool  = require('../../Config/database');
     const eid   = req.user.empresa_id;
-    const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo    = req.user.rol_id === 1 || cargo.includes('almacen');
-    const esDirector = cargo.includes('director tecnico');
+    const verTodo    = req.user.rol_id === 1 || req.user.es_almacen;
+    const esDirector = req.user.es_director_tecnico;
 
     // Tres niveles de acceso
     let scopeCondR, scopeCondR2, scopeCondNoAlias, scopeParam;
@@ -41,9 +42,7 @@ router.get('/resumen', authorize(...SALUD_ADMIN_ING), async (req, res, next) => 
     }
 
     // Auxiliar no ve MEDICAMENTOS ni MQ — aplicar en KPIs y categorías
-    const cargoResumen  = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const esPrivResumen = cargoResumen.includes('almacen') || cargoResumen.includes('director tecnico');
-    const esAuxResumen  = !esPrivResumen && cargoResumen.includes('auxiliar');
+    const esAuxResumen = !verTodo && !esDirector && req.user.es_auxiliar;
     const catResumen    = esAuxResumen ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')" : '';
 
     const [[totales], [porCategoria], [recientes]] = await Promise.all([
@@ -122,10 +121,9 @@ router.get('/alertas-badge', authorize(...SALUD_ADMIN_ING), async (req, res, nex
   try {
     const pool = require('../../Config/database');
     const eid  = req.user.empresa_id;
-    const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo    = req.user.rol_id === 1 || cargo.includes('almacen');
-    const esDirector = cargo.includes('director tecnico');
-    const esAuxiliar = !verTodo && !esDirector && cargo.includes('auxiliar');
+    const verTodo    = req.user.rol_id === 1 || req.user.es_almacen;
+    const esDirector = req.user.es_director_tecnico;
+    const esAuxiliar = !verTodo && !esDirector && req.user.es_auxiliar;
     const catCond    = esAuxiliar ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')" : '';
 
     let rows;
@@ -226,10 +224,9 @@ router.get('/alertas-vencimiento', authorize(...SALUD_ADMIN_ING), async (req, re
   try {
     const pool     = require('../../Config/database');
     const eid      = req.user.empresa_id;
-    const cargo    = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const verTodo2    = req.user.rol_id === 1 || cargo.includes('almacen');
-    const esDirector2 = cargo.includes('director tecnico');
-    const catCond2    = (!verTodo2 && !esDirector2 && cargo.includes('auxiliar'))
+    const verTodo2    = req.user.rol_id === 1 || req.user.es_almacen;
+    const esDirector2 = req.user.es_director_tecnico;
+    const catCond2    = (!verTodo2 && !esDirector2 && req.user.es_auxiliar)
       ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
       : '';
 
@@ -329,7 +326,7 @@ router.get('/valorizado/reporte', authorize(...SALUD_ADMIN_ING), async (req, res
   try {
     const { formato = 'json', ...filters } = req.query;
     const rows = await svc.getValorizadoReporte(
-      req.user.empresa_id, req.user.id, req.user.rol_id, req.user.cargo, filters,
+      req.user.empresa_id, req.user.id, req.user.rol_id, req.user, filters,
     );
 
     if (formato === 'xlsx') {
@@ -394,14 +391,14 @@ router.get('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
 
 router.get('/items', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
-    const data = await svc.findAllItems(req.user.empresa_id, req.user.id, req.user.rol_id, req.user.cargo);
+    const data = await svc.findAllItems(req.user.empresa_id, req.user.id, req.user.rol_id, req.user);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
 
 router.get('/items/reporte', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
   try {
-    const data = await svc.findItemsForReport(req.user.empresa_id, req.user.id, req.user.rol_id, req.user.cargo);
+    const data = await svc.findItemsForReport(req.user.empresa_id, req.user.id, req.user.rol_id, req.user);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 });
@@ -414,7 +411,7 @@ router.get('/borrador/mio', authorize(...SALUD_ADMIN_ING), async (req, res, next
   } catch (err) { next(err); }
 });
 
-router.post('/borrador', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+router.post('/borrador', authorize(...SALUD_ADMIN_ING), validate(borradorSchema), async (req, res, next) => {
   try {
     const data = await svc.saveBorrador(req.body, req.user.id, req.user.empresa_id);
     res.json({ success: true, data });
@@ -435,7 +432,7 @@ router.get('/salidas-reporte', authorize(...SALUD_ADMIN_ING), async (req, res, n
       req.user.empresa_id,
       req.user.id,
       req.user.rol_id,
-      req.user.cargo,
+      req.user,
       req.query
     );
     res.json({ success: true, data });
@@ -443,7 +440,7 @@ router.get('/salidas-reporte', authorize(...SALUD_ADMIN_ING), async (req, res, n
 });
 
 //  SALIDAS
-router.post('/salidas', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+router.post('/salidas', authorize(...SALUD_ADMIN_ING), validate(salidaSchema), async (req, res, next) => {
   try {
     const id = await svc.createSalida(req.body, req.user.id, req.user.empresa_id);
     res.status(201).json({ success: true, data: { id } });
@@ -472,7 +469,7 @@ router.get('/items/:id/trazabilidad', authorize(...SALUD_ADMIN_ING), async (req,
   } catch (err) { next(err); }
 });
 
-router.post('/', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+router.post('/', authorize(...SALUD_ADMIN_ING), validate(createSchema), async (req, res, next) => {
   try {
     const data = await svc.create(req.body, req.user.id, req.user.empresa_id);
     res.status(201).json({ success: true, data });

@@ -16,15 +16,18 @@ const authenticate = (req, res, next) => {
     if (!decoded.empresa_id) throw new AppError('Token inválido: sin empresa.', 401);
 
     req.user = {
-      id:           decoded.id,
-      empresa_id:   decoded.empresa_id,
-      rol_id:       decoded.rol_id,
-      email:        decoded.email,
-      cargo_id:     decoded.cargo_id     || null,
-      cargo:        decoded.cargo        || null,
-      nombres:      decoded.nombres      || null,
-      apellidos:    decoded.apellidos    || null,
-      municipio_id: decoded.municipio_id ?? null,
+      id:                  decoded.id,
+      empresa_id:          decoded.empresa_id,
+      rol_id:              decoded.rol_id,
+      email:               decoded.email,
+      cargo_id:            decoded.cargo_id            || null,
+      cargo:               decoded.cargo               || null,
+      nombres:             decoded.nombres             || null,
+      apellidos:           decoded.apellidos           || null,
+      municipio_id:        decoded.municipio_id        ?? null,
+      es_almacen:          !!decoded.es_almacen,
+      es_director_tecnico: !!decoded.es_director_tecnico,
+      es_auxiliar:         !!decoded.es_auxiliar,
     };
 
     next();

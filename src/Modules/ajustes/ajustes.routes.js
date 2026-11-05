@@ -2,19 +2,17 @@ const router   = require('express').Router();
 const svc      = require('./ajustes.service');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
+const validate         = require('../../Middlewares/validate.middleware');
 const ROLES    = require('../../Utils/roles');
 const AppError = require('../../Utils/AppError');
+const { crearSchema } = require('./ajustes.schema');
 
 router.use(authenticate);
 
 // Solo ADMIN y SALUD pueden crear ajustes; el controller verificará además el cargo
-router.post('/', authorize(ROLES.ADMIN, ROLES.SALUD), async (req, res, next) => {
+router.post('/', authorize(ROLES.ADMIN, ROLES.SALUD), validate(crearSchema), async (req, res, next) => {
   try {
-    const cargo = (req.user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-    const esAlmacen  = cargo.includes('almacen');
-    const esDirector = cargo.includes('director tecnico');
-
-    if (req.user.rol_id !== ROLES.ADMIN && !esAlmacen && !esDirector) {
+    if (req.user.rol_id !== ROLES.ADMIN && !req.user.es_almacen && !req.user.es_director_tecnico) {
       return next(new AppError('No autorizado para crear ajustes de inventario.', 403));
     }
 

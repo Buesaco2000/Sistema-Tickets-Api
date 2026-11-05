@@ -2,7 +2,9 @@ const router = require('express').Router();
 const svc    = require('./traslados.service');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
+const validate         = require('../../Middlewares/validate.middleware');
 const ROLES            = require('../../Utils/roles');
+const { confirmarSchema } = require('./traslados.schema');
 
 router.use(authenticate);
 
@@ -25,7 +27,7 @@ router.get('/pendientes/count', authorize(...SALUD_ADMIN_ING), async (req, res, 
 });
 
 // POST /traslados/:id/confirmar
-router.post('/:id/confirmar', authorize(...SALUD_ADMIN_ING), async (req, res, next) => {
+router.post('/:id/confirmar', authorize(...SALUD_ADMIN_ING), validate(confirmarSchema), async (req, res, next) => {
   try {
     const responsable = req.body.responsable_destino ||
       (await require('../../Config/database').query(

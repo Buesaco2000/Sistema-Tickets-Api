@@ -28,7 +28,7 @@ router.get('/', authorize(...SALUD_ADMIN), async (req, res, next) => {
       req.user.empresa_id,
       req.user.id,
       req.user.rol_id,
-      req.user.cargo,
+      req.user,
       pag
     );
     res.json({ success: true, ...result });

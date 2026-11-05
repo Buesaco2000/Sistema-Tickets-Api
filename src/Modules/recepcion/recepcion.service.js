@@ -376,13 +376,11 @@ const softDelete = async (id, empresaId) => {
 };
 
 // Solo ítems de recepciones COMPLETADAS (borradores no tienen stock)
-const findAllItems = async (empresaId, userId, rolId, cargo) => {
-  const c = (cargo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const esAlmacen  = c.includes("almacen");
-  const esDirector = c.includes("director tecnico");
+const findAllItems = async (empresaId, userId, rolId, user) => {
+  const esAlmacen      = !!user.es_almacen;
+  const esDirector     = !!user.es_director_tecnico;
   const esPrivilegiado = esAlmacen || esDirector;
-  // Auxiliar sin acceso a almacén no puede ver MEDICAMENTOS ni MQ
-  const esAuxiliar = !esPrivilegiado && c.includes("auxiliar");
+  const esAuxiliar     = !esPrivilegiado && !!user.es_auxiliar;
   const catFilter  = esAuxiliar
     ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
     : "";
@@ -608,7 +606,7 @@ const createSalida = async (data, userId, empresaId) => {
 
   const stock = Math.max(
     0,
-    item.cant_recepcionada - item.total_salidas - item.total_dispensado + item.total_ajustes,
+    Number(item.cant_recepcionada) - Number(item.total_salidas) - Number(item.total_dispensado) + Number(item.total_ajustes),
   );
   if (cantidad > stock) {
     throw new AppError(`Stock insuficiente. Disponible: ${stock}`, 400);
@@ -711,12 +709,11 @@ const getDispensacionesByItem = async (itemId, empresaId) => {
   return rows;
 };
 
-const findItemsForReport = async (empresaId, userId, rolId, cargo) => {
-  const c = (cargo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const esAlmacen      = c.includes("almacen");
-  const esDirector     = c.includes("director tecnico");
+const findItemsForReport = async (empresaId, userId, rolId, user) => {
+  const esAlmacen      = !!user.es_almacen;
+  const esDirector     = !!user.es_director_tecnico;
   const esPrivilegiado = esAlmacen || esDirector;
-  const esAuxiliar     = rolId !== ROLES.ADMIN && !esPrivilegiado && c.includes("auxiliar");
+  const esAuxiliar     = rolId !== ROLES.ADMIN && !esPrivilegiado && !!user.es_auxiliar;
   const catFilter      = esAuxiliar
     ? " AND i.tipo_recepcion NOT IN ('MEDICAMENTOS','MEDICO_QUIRURGICO')"
     : "";
@@ -855,9 +852,8 @@ const getTrazabilidad = async (itemId, empresaId) => {
   return { item, salidas, dispensaciones, traslados, ajustes };
 };
 
-const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) => {
-  const c = (cargo || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  const esAlmacen = c.includes("almacen") || rolId === ROLES.ADMIN;
+const getSalidasReporte = async (empresaId, userId, rolId, user, query = {}) => {
+  const esAlmacen = !!user.es_almacen || rolId === ROLES.ADMIN;
 
   const { tipo_recepcion, fecha_desde, fecha_hasta } = query;
 
@@ -943,12 +939,11 @@ const getSalidasReporte = async (empresaId, userId, rolId, cargo, query = {}) =>
   return todos;
 };
 
-const getValorizadoReporte = async (empresaId, userId, rolId, cargo, filters = {}) => {
-  const c = (cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const esAlmacen      = c.includes('almacen');
-  const esDirector     = c.includes('director tecnico');
+const getValorizadoReporte = async (empresaId, userId, rolId, user, filters = {}) => {
+  const esAlmacen      = !!user.es_almacen;
+  const esDirector     = !!user.es_director_tecnico;
   const esPrivilegiado = esAlmacen || esDirector;
-  const esAuxiliar     = rolId !== ROLES.ADMIN && !esPrivilegiado && c.includes('auxiliar');
+  const esAuxiliar     = rolId !== ROLES.ADMIN && !esPrivilegiado && !!user.es_auxiliar;
 
   const conds  = ["r.empresa_id = ?", "r.deleted_at IS NULL", "r.estado = 'COMPLETADA'"];
   const params = [empresaId];

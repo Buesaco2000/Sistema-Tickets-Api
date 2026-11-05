@@ -12,28 +12,31 @@ const useSecure = process.env.COOKIE_SECURE === 'true';
 const COOKIE_OPTS_ACCESS = {
   httpOnly: true,
   secure:   useSecure,
-  sameSite: 'lax',
-  maxAge:   15 * 60 * 1000,           // 15 min
+  sameSite: useSecure ? 'strict' : 'lax', // strict solo con HTTPS; lax en dev (http)
+  maxAge:   15 * 60 * 1000,
 };
 
 const COOKIE_OPTS_REFRESH = {
   httpOnly: true,
   secure:   useSecure,
-  sameSite: 'lax',
-  maxAge:   7 * 24 * 60 * 60 * 1000, // 7 días
+  sameSite: useSecure ? 'strict' : 'lax',
+  maxAge:   7 * 24 * 60 * 60 * 1000,
 };
 
 const _generateTokens = (user) => {
   const payload = {
-    id:           user.id,
-    empresa_id:   user.empresa_id,
-    rol_id:       user.rol_id,
-    email:        user.email,
-    cargo_id:     user.cargo_id    || null,
-    cargo:        user.cargo       || null,
-    nombres:      user.nombres     || null,
-    apellidos:    user.apellidos   || null,
-    municipio_id: user.municipio_id || null,  // necesario para filtros por municipio
+    id:                  user.id,
+    empresa_id:          user.empresa_id,
+    rol_id:              user.rol_id,
+    email:               user.email,
+    cargo_id:            user.cargo_id            || null,
+    cargo:               user.cargo               || null,
+    nombres:             user.nombres             || null,
+    apellidos:           user.apellidos           || null,
+    municipio_id:        user.municipio_id        || null,
+    es_almacen:          user.es_almacen          ? 1 : 0,
+    es_director_tecnico: user.es_director_tecnico ? 1 : 0,
+    es_auxiliar:         user.es_auxiliar         ? 1 : 0,
   };
   const accessToken = jwt.sign(payload, process.env.JWT_ACCESS_SECRET, { expiresIn: '15m' });
   const refreshToken = jwt.sign(
@@ -50,6 +53,7 @@ const login = async (email, password, empresaId) => {
             u.cargo_id, u.municipio_id, u.sede_id, u.telefono, u.activo, u.deleted_at,
             r.nombre AS rol,
             c.nombre AS cargo,
+            c.es_almacen, c.es_director_tecnico, c.es_auxiliar,
             m.nombre AS municipio,
             s.nombre AS sede
      FROM users u
@@ -81,25 +85,32 @@ const login = async (email, password, empresaId) => {
     [user.id, tokenHash]
   );
 
+  // Limpieza fire-and-forget: elimina tokens expirados de ambas tablas
+  pool.query('DELETE FROM refresh_tokens        WHERE expires_at < NOW()').catch(() => {});
+  pool.query('DELETE FROM password_reset_tokens WHERE expires_at < NOW()').catch(() => {});
+
   return {
     tokens,
     cookieOpts: { access: COOKIE_OPTS_ACCESS, refresh: COOKIE_OPTS_REFRESH },
     user: {
-      id:           user.id,
-      email:        user.email,
-      nombres:      user.nombres,
-      apellidos:    user.apellidos,
-      rol_id:       user.rol_id,
-      rol:          user.rol,
-      empresa_id:   user.empresa_id,
-      cargo_id:     user.cargo_id,
-      cargo:        user.cargo,
-      municipio_id: user.municipio_id,
-      municipio:    user.municipio,
-      sede_id:      user.sede_id,
-      sede:         user.sede,
-      telefono:     user.telefono,
-      activo:       user.activo,
+      id:                  user.id,
+      email:               user.email,
+      nombres:             user.nombres,
+      apellidos:           user.apellidos,
+      rol_id:              user.rol_id,
+      rol:                 user.rol,
+      empresa_id:          user.empresa_id,
+      cargo_id:            user.cargo_id,
+      cargo:               user.cargo,
+      municipio_id:        user.municipio_id,
+      municipio:           user.municipio,
+      sede_id:             user.sede_id,
+      sede:                user.sede,
+      telefono:            user.telefono,
+      activo:              user.activo,
+      es_almacen:          user.es_almacen          ? 1 : 0,
+      es_director_tecnico: user.es_director_tecnico ? 1 : 0,
+      es_auxiliar:         user.es_auxiliar         ? 1 : 0,
     },
   };
 };
@@ -116,7 +127,8 @@ const refresh = async (refreshToken) => {
 
   const [rows] = await pool.query(
     `SELECT rt.token_hash, u.id, u.empresa_id, u.rol_id, u.email, u.activo, u.deleted_at,
-            u.cargo_id, c.nombre AS cargo, u.nombres, u.apellidos
+            u.cargo_id, c.nombre AS cargo, c.es_almacen, c.es_director_tecnico, c.es_auxiliar,
+            u.nombres, u.apellidos
      FROM refresh_tokens rt
      JOIN users u ON u.id = rt.user_id
      LEFT JOIN cargos c ON c.id = u.cargo_id
@@ -170,7 +182,8 @@ const register = async (data, createdBy, creatorEmpresaId) => {
 
 // Registro público — cualquier persona puede crear su cuenta
 const registerPublic = async (data) => {
-  const { nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, sede_id, telefono } = data;
+  // rol_id no se acepta del body - siempre se asigna SALUD; un admin puede cambiar el rol después
+  const { nombres, apellidos, email, password, empresa_id, cargo_id, municipio_id, sede_id, telefono } = data;
 
   const [existing] = await pool.query(
     'SELECT id FROM users WHERE email = ? AND empresa_id = ?',
@@ -184,7 +197,7 @@ const registerPublic = async (data) => {
     `INSERT INTO users (nombres, apellidos, email, password, empresa_id, rol_id, cargo_id, municipio_id, sede_id, telefono)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [nombres, apellidos, email.toLowerCase().trim(), hashed, empresa_id,
-     rol_id || ROLES.SALUD,
+     ROLES.SALUD,
      cargo_id || null, municipio_id || null, sede_id || null, telefono || null]
   );
 

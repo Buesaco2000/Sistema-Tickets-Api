@@ -55,8 +55,12 @@ const authLimiter = rateLimit({
 });
 
 app.use("/api/", globalLimiter);
-app.use("/api/v1/auth/login",   authLimiter);
-app.use("/api/v1/auth/refresh", authLimiter);
+app.use("/api/v1/auth/login",           authLimiter);
+app.use("/api/v1/auth/refresh",         authLimiter);
+app.use("/api/v1/auth/registro",        authLimiter);
+app.use("/api/v1/auth/register",        authLimiter);
+app.use("/api/v1/auth/forgot-password", authLimiter);
+app.use("/api/v1/auth/reset-password",  authLimiter);
 
 // Deshabilita caché del navegador para todas las respuestas de la API
 app.use("/api/", (req, res, next) => {
@@ -104,22 +108,22 @@ v1.use("/catalogos/estados",      require("./src/Modules/catalogos/estados/estad
 
 v1.use("/catalogos/municipios",       require("./src/Modules/catalogos/municipios/municipio.routes.js"));
 
-v1.use("/catalogos/roles-tickets",            require("./src/Modules/catalogos/roles tickets/rolesTicket.routes.js"));
+v1.use("/catalogos/roles-tickets",            require("./src/Modules/catalogos/rolesTickets/rolesTicket.routes.js"));
 
 v1.use("/catalogos/sedes", require("./src/Modules/catalogos/sedes/sedes.routes.js"));
 
-v1.use("/catalogos/tipos-soporte",    require("./src/Modules/catalogos/tipo soporte/tiposSoporte.routes.js"));
+v1.use("/catalogos/tipos-soporte",    require("./src/Modules/catalogos/tipoSoporte/tiposSoporte.routes.js"));
 
-v1.use("/catalogos/tipos-equipo", require("./src/Modules/catalogos/equipos catalogos/tiposEquipo.routes.js"));
-v1.use("/catalogos/fabricantes", require("./src/Modules/catalogos/equipos catalogos/fabricantes.routes.js"));
-v1.use("/catalogos/proveedores", require("./src/Modules/catalogos/equipos catalogos/proveedores.routes.js"));
-v1.use("/catalogos/nivel-riesgo", require("./src/Modules/catalogos/equipos catalogos/nivelRiesgo.routes.js"));
-v1.use("/catalogos/clasificacion-riesgo", require("./src/Modules/catalogos/equipos catalogos/clasificacionRiesgo.routes.js"));
-v1.use("/catalogos/clasificacion-biomedica", require("./src/Modules/catalogos/equipos catalogos/clasificacionBiomedica.routes.js"));
-v1.use("/catalogos/frecuencia-mantenimiento", require("./src/Modules/catalogos/equipos catalogos/frecuenciaMantenimiento.routes.js"));
-v1.use("/catalogos/nivel-complejidad", require("./src/Modules/catalogos/equipos catalogos/nivelComplejidad.routes.js"));
-v1.use("/catalogos/clase-tecnologia", require("./src/Modules/catalogos/equipos catalogos/claseTecnologia.routes.js"));
-v1.use("/catalogos/tipos-documento", require("./src/Modules/catalogos/equipos catalogos/tiposDocumento.routes.js"));
+v1.use("/catalogos/tipos-equipo", require("./src/Modules/catalogos/equiposCatalogos/tiposEquipo.routes.js"));
+v1.use("/catalogos/fabricantes", require("./src/Modules/catalogos/equiposCatalogos/fabricantes.routes.js"));
+v1.use("/catalogos/proveedores", require("./src/Modules/catalogos/equiposCatalogos/proveedores.routes.js"));
+v1.use("/catalogos/nivel-riesgo", require("./src/Modules/catalogos/equiposCatalogos/nivelRiesgo.routes.js"));
+v1.use("/catalogos/clasificacion-riesgo", require("./src/Modules/catalogos/equiposCatalogos/clasificacionRiesgo.routes.js"));
+v1.use("/catalogos/clasificacion-biomedica", require("./src/Modules/catalogos/equiposCatalogos/clasificacionBiomedica.routes.js"));
+v1.use("/catalogos/frecuencia-mantenimiento", require("./src/Modules/catalogos/equiposCatalogos/frecuenciaMantenimiento.routes.js"));
+v1.use("/catalogos/nivel-complejidad", require("./src/Modules/catalogos/equiposCatalogos/nivelComplejidad.routes.js"));
+v1.use("/catalogos/clase-tecnologia", require("./src/Modules/catalogos/equiposCatalogos/claseTecnologia.routes.js"));
+v1.use("/catalogos/tipos-documento", require("./src/Modules/catalogos/equiposCatalogos/tiposDocumento.routes.js"));
 
 // RUTAS DE CARPETA EQUIPOS
 v1.use("/equipos",                    require("./src/Modules/equipos/equipo.routes.js"));

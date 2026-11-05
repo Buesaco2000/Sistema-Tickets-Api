@@ -1,9 +1,11 @@
 const { Router } = require('express');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
+const validate         = require('../../Middlewares/validate.middleware');
 const ROLES            = require('../../Utils/roles');
 const { uploadInforme } = require('../../Utils/uploadFile');
 const ctrl = require('./informes.controller');
+const { cambiarEstadoSchema } = require('./informes.schema');
 
 const router = Router();
 
@@ -13,7 +15,7 @@ router.get('/resumen',              authenticate, authorize(...ARCHIVOS_ADMIN), 
 router.get('/anios',                authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getAnios);
 router.get('/',                     authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getAll);
 router.get('/:id',                  authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getOne);
-router.patch('/:id/estado',         authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.cambiarEstado);
+router.patch('/:id/estado',         authenticate, authorize(...ARCHIVOS_ADMIN), validate(cambiarEstadoSchema), ctrl.cambiarEstado);
 router.post('/:id/evidencias',      authenticate, authorize(...ARCHIVOS_ADMIN), uploadInforme.single('archivo'), ctrl.subirEvidencia);
 router.delete('/evidencias/:id',    authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.remove);
 

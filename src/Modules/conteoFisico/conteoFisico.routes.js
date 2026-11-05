@@ -3,7 +3,9 @@ const svc      = require('./conteoFisico.service');
 const AppError = require('../../Utils/AppError');
 const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize }    = require('../../Middlewares/rbac.middleware');
+const validate         = require('../../Middlewares/validate.middleware');
 const ROLES            = require('../../Utils/roles');
+const { crearSchema, actualizarItemsSchema, cerrarSchema, hallazgoSchema } = require('./conteoFisico.schema');
 
 router.use(authenticate);
 
@@ -11,7 +13,7 @@ const ADMIN_SALUD = [ROLES.ADMIN, ROLES.SALUD];
 
 const esPrivilegiado = (user) => {
   const c = (user.cargo || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  return user.rol_id === ROLES.ADMIN || c.includes('almacen') || c.includes('director');
+  return user.rol_id === ROLES.ADMIN || user.es_almacen || c.includes('director');
 };
 
 router.get('/', authorize(...ADMIN_SALUD), async (req, res, next) => {
@@ -21,7 +23,7 @@ router.get('/', authorize(...ADMIN_SALUD), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.post('/', authorize(...ADMIN_SALUD), async (req, res, next) => {
+router.post('/', authorize(...ADMIN_SALUD), validate(crearSchema), async (req, res, next) => {
   try {
     if (!esPrivilegiado(req.user)) throw new AppError('Solo ADMIN o Almacén puede crear conteos.', 403);
     const data = await svc.crear(req.body, req.user.id, req.user.empresa_id);
@@ -36,7 +38,7 @@ router.get('/:id', authorize(...ADMIN_SALUD), async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-router.patch('/:id/items', authorize(...ADMIN_SALUD), async (req, res, next) => {
+router.patch('/:id/items', authorize(...ADMIN_SALUD), validate(actualizarItemsSchema), async (req, res, next) => {
   try {
     if (!esPrivilegiado(req.user)) throw new AppError('No tienes permiso para editar este conteo.', 403);
     await svc.actualizarItems(Number(req.params.id), req.body.items ?? [], req.user.empresa_id);
@@ -44,7 +46,7 @@ router.patch('/:id/items', authorize(...ADMIN_SALUD), async (req, res, next) => 
   } catch (e) { next(e); }
 });
 
-router.post('/:id/cerrar', authorize(...ADMIN_SALUD), async (req, res, next) => {
+router.post('/:id/cerrar', authorize(...ADMIN_SALUD), validate(cerrarSchema), async (req, res, next) => {
   try {
     if (!esPrivilegiado(req.user)) throw new AppError('Solo ADMIN o Almacén puede cerrar conteos.', 403);
     const { crearAjustes = false } = req.body;
@@ -62,7 +64,7 @@ router.get('/:id/hallazgos', authorize(...ADMIN_SALUD), async (req, res, next) =
   } catch (e) { next(e); }
 });
 
-router.post('/:id/hallazgos', authorize(...ADMIN_SALUD), async (req, res, next) => {
+router.post('/:id/hallazgos', authorize(...ADMIN_SALUD), validate(hallazgoSchema), async (req, res, next) => {
   try {
     if (!esPrivilegiado(req.user)) throw new AppError('Solo ADMIN o Almacén puede registrar hallazgos.', 403);
     const data = await svc.agregarHallazgo(Number(req.params.id), req.body, req.user.empresa_id);

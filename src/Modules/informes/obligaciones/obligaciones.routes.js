@@ -1,8 +1,10 @@
 const { Router } = require("express");
 const { authenticate } = require('../../../Middlewares/auth.middleware');
 const { authorize }    = require('../../../Middlewares/rbac.middleware');
+const validate         = require('../../../Middlewares/validate.middleware');
 const ROLES            = require('../../../Utils/roles');
 const ctrl = require("./obligaciones.controller");
+const { crearSchema, actualizarSchema } = require('./obligaciones.schema');
 
 const router = Router();
 
@@ -15,8 +17,8 @@ router.get("/:id",                       authenticate, authorize(...ARCHIVOS_ADM
 router.get("/:id/ejecuciones",           authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.getEjecuciones);
 
 // Escritura — ADMIN y ARCHIVOS
-router.post("/",                         authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.create);
-router.put("/:id",                       authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.update);
+router.post("/",    authenticate, authorize(...ARCHIVOS_ADMIN), validate(crearSchema),      ctrl.create);
+router.put("/:id",  authenticate, authorize(...ARCHIVOS_ADMIN), validate(actualizarSchema), ctrl.update);
 router.patch("/:id/activo",              authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.toggleActivo);
 router.delete("/:id",                    authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.remove);
 router.post("/:id/generar-ejecuciones", authenticate, authorize(...ARCHIVOS_ADMIN), ctrl.generarEjecuciones);

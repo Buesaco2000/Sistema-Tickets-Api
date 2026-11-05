@@ -49,6 +49,7 @@ const me = async (req, res, next) => {
               u.cargo_id, u.municipio_id, u.sede_id, u.telefono, u.activo,
               r.nombre  AS rol,
               c.nombre  AS cargo,
+              c.es_almacen, c.es_director_tecnico, c.es_auxiliar,
               m.nombre  AS municipio,
               s.nombre  AS sede
        FROM users u

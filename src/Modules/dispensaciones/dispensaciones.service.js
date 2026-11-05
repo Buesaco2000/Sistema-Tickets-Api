@@ -7,11 +7,11 @@ const { logAudit }   = require('../../Utils/auditLog');
 
 const TIPOS_TODOS = ['KIT', 'URGENCIAS', 'HOSPITALIZACION', 'CARRO_PARO', 'AMBULANCIAS'];
 
-function tiposPermitidos(cargo = '') {
-  const c = cargo.toLowerCase();
-  if (c.includes('director tecnico')) return TIPOS_TODOS;
-  if (c.includes('jefe'))             return TIPOS_TODOS;       
-  if (c.includes('auxiliar'))         return ['URGENCIAS', 'HOSPITALIZACION'];
+function tiposPermitidos(user = {}) {
+  const c = (user.cargo || '').toLowerCase();
+  if (user.es_director_tecnico)   return TIPOS_TODOS;
+  if (c.includes('jefe'))         return TIPOS_TODOS;
+  if (user.es_auxiliar)           return ['URGENCIAS', 'HOSPITALIZACION'];
   return TIPOS_TODOS;
 }
 
@@ -81,7 +81,7 @@ const crear = async (data, directorId, empresaId) => {
       );
       if (!item) throw new AppError(`Ítem ${it.item_id} no encontrado.`, 404);
 
-      const stockDisponible = Math.max(0, item.cant_recepcionada - item.total_salidas - item.total_dispensado);
+      const stockDisponible = Math.max(0, Number(item.cant_recepcionada) - Number(item.total_salidas) - Number(item.total_dispensado));
       if (it.cantidad > stockDisponible)
         throw new AppError(
           `Stock insuficiente para "${item.nombre}". Disponible: ${stockDisponible}`,
@@ -114,7 +114,7 @@ const crear = async (data, directorId, empresaId) => {
 };
 
 
-const listar = async (empresaId, userId, rolId, cargo, pag = { page: 1, limit: 100, offset: 0 }) => {
+const listar = async (empresaId, userId, rolId, user, pag = { page: 1, limit: 100, offset: 0 }) => {
   // Si no es ADMIN, obtener municipio del usuario
   let municipioId = null;
   if (rolId !== ROLES.ADMIN) {
@@ -134,10 +134,8 @@ const listar = async (empresaId, userId, rolId, cargo, pag = { page: 1, limit: 1
     params.push(municipioId);
   }
 
-  const c = (cargo || '').toLowerCase();
-
   if (rolId !== ROLES.ADMIN) {
-    if (c.includes('director tecnico')) {
+    if (user.es_director_tecnico) {
       // El Director ve lo que él creó
       conds.push('d.director_id = ?');
       params.push(userId);
@@ -147,7 +145,7 @@ const listar = async (empresaId, userId, rolId, cargo, pag = { page: 1, limit: 1
       params.push(userId);
 
       // Solo los tipos que su cargo permite ver
-      const tipos = tiposPermitidos(cargo);
+      const tipos = tiposPermitidos(user);
       // Genera placeholders: ?,?,? según cantidad de tipos
       conds.push(`d.tipo IN (${tipos.map(() => '?').join(',')})`);
       params.push(...tipos);
