@@ -3,6 +3,7 @@ const { authenticate } = require('../../Middlewares/auth.middleware');
 const { authorize } = require('../../Middlewares/rbac.middleware');
 const validate = require('../../Middlewares/validate.middleware');
 const { crearSchema, actualizarSchema } = require('./catalogoItems.schema');
+const ROLES = require('../../Utils/roles');
 
 // Crea un router de catálogo (búsqueda + CRUD) para una categoría fija de catalogo_items
 module.exports = (categoria) => {
@@ -35,21 +36,21 @@ module.exports = (categoria) => {
   });
 
   // Solo ADMIN puede gestionar el catálogo
-  router.post('/', authorize('ADMIN'), validate(crearSchema), async (req, res, next) => {
+  router.post('/', authorize(ROLES.ADMIN), validate(crearSchema), async (req, res, next) => {
     try {
       const data = await svc.create(req.body, req.user.empresa_id, categoria);
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   });
 
-  router.put('/:id', authorize('ADMIN'), validate(actualizarSchema), async (req, res, next) => {
+  router.put('/:id', authorize(ROLES.ADMIN), validate(actualizarSchema), async (req, res, next) => {
     try {
       const data = await svc.update(Number(req.params.id), req.body, req.user.empresa_id, categoria);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   });
 
-  router.delete('/:id', authorize('ADMIN'), async (req, res, next) => {
+  router.delete('/:id', authorize(ROLES.ADMIN), async (req, res, next) => {
     try {
       await svc.softDelete(Number(req.params.id), req.user.empresa_id, categoria);
       res.json({ success: true });

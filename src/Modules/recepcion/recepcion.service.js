@@ -423,7 +423,9 @@ const findAllItems = async (empresaId, userId, rolId, user) => {
               i.codigo_interno, i.nombre,
               i.presentacion_comercial, i.concentracion,
               i.fecha_vencimiento, i.lote,
-              i.cant_solicitada, i.cant_recepcionada, i.precio_unitario,
+              i.cant_solicitada, i.cant_recepcionada,
+              COALESCE(i.precio_unitario, cat2.precio_regulado) AS precio_unitario,
+              cat2.precio_regulado,
               GREATEST(0,
                 COALESCE(i.cant_recepcionada, 0)
                 - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
@@ -439,10 +441,11 @@ const findAllItems = async (empresaId, userId, rolId, user) => {
                 - COALESCE((SELECT SUM(di2.cantidad) FROM dispensacion_items di2
                             JOIN dispensaciones d2 ON d2.id = di2.dispensacion_id
                             WHERE di2.item_id = i.id AND d2.estado != 'RECHAZADO'), 0)
-              ) * COALESCE(i.precio_unitario, 0) AS valor_total,
+              ) * COALESCE(i.precio_unitario, cat2.precio_regulado, 0) AS valor_total,
               r.fecha AS fecha_recepcion, r.proveedor
        FROM items_recepcion_inventario i
        JOIN recepciones_inventario r ON r.id = i.recepcion_id
+       LEFT JOIN catalogo_items cat2 ON cat2.id = i.catalogo_id
        WHERE r.responsable_recibe_id = ?
          AND r.empresa_id = ?
          AND r.estado = 'COMPLETADA'
@@ -507,7 +510,9 @@ const findAllItems = async (empresaId, userId, rolId, user) => {
             i.tipo_recepcion,
             i.codigo_interno, i.nombre, i.presentacion_comercial,
             i.concentracion, i.fecha_vencimiento, i.lote,
-            i.cant_solicitada, i.cant_recepcionada, i.precio_unitario,
+            i.cant_solicitada, i.cant_recepcionada,
+            COALESCE(i.precio_unitario, c.precio_regulado) AS precio_unitario,
+            c.precio_regulado,
             GREATEST(0,
               COALESCE(i.cant_recepcionada, 0)
               - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
@@ -527,7 +532,7 @@ const findAllItems = async (empresaId, userId, rolId, user) => {
                           WHERE di.item_id = i.id AND d.estado != 'RECHAZADO'), 0)
               + COALESCE((SELECT SUM(a.cantidad) FROM ajustes_inventario a
                           WHERE a.item_id = i.id), 0)
-            ) * COALESCE(i.precio_unitario, 0) AS valor_total,
+            ) * COALESCE(i.precio_unitario, c.precio_regulado, 0) AS valor_total,
             r.fecha AS fecha_recepcion, r.proveedor,
             r.remision_factura AS no_factura,
             mu.nombre AS municipio,
@@ -768,6 +773,9 @@ const findItemsForReport = async (empresaId, userId, rolId, user) => {
             i.snna, i.cod, i.acr, i.estado_empaque,
             i.humedo, i.colapsado, i.manchado,
             i.etiquetas, i.tipo_etiquetas,
+            COALESCE(i.precio_unitario, c.precio_regulado) AS precio_unitario,
+            c.precio_2026,
+            c.precio_regulado,
             r.fecha AS fecha_recepcion, r.proveedor,
             r.remision_factura, r.responsable_recibe,
             mu.nombre AS municipio, se.nombre AS sede,
@@ -1003,9 +1011,9 @@ const getValorizadoReporte = async (empresaId, userId, rolId, user, filters = {}
             i.lote,
             i.fecha_vencimiento,
             i.cant_recepcionada,
-            i.precio_unitario,
+            COALESCE(i.precio_unitario, cat.precio_regulado) AS precio_unitario,
             ${STOCK}                                          AS stock,
-            ${STOCK} * COALESCE(i.precio_unitario, 0)        AS valor_total,
+            ${STOCK} * COALESCE(i.precio_unitario, cat.precio_regulado, 0) AS valor_total,
             r.fecha           AS fecha_recepcion,
             r.proveedor,
             r.remision_factura,

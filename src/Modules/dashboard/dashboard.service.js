@@ -28,7 +28,9 @@ async function getInventario(empresaId, municipioId) {
   // KPIs principales con stock calculado
   const [[kpis]] = await pool.query(`
     WITH sc AS (
-      SELECT i.id, i.fecha_vencimiento, i.precio_unitario, i.tipo_recepcion,
+      SELECT i.id, i.fecha_vencimiento,
+        COALESCE(i.precio_unitario, cat.precio_regulado) AS precio_unitario,
+        i.tipo_recepcion,
         GREATEST(0,
           COALESCE(i.cant_recepcionada, 0)
           - COALESCE((SELECT SUM(s.cantidad) FROM salidas_medicamentos s
@@ -41,6 +43,7 @@ async function getInventario(empresaId, municipioId) {
         ) AS stock
       FROM items_recepcion_inventario i
       JOIN recepciones_inventario r ON r.id = i.recepcion_id
+      LEFT JOIN catalogo_items cat ON cat.id = i.catalogo_id
       WHERE r.empresa_id = ? AND r.deleted_at IS NULL AND r.estado = 'COMPLETADA'${munCond}
     )
     SELECT

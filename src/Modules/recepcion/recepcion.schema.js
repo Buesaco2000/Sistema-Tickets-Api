@@ -2,20 +2,25 @@ const { z } = require('zod');
 
 const TIPOS_RECEPCION = ['MEDICAMENTOS', 'LABORATORIO', 'MEDICO_QUIRURGICO', 'ASEO_PAPELERIA', 'ODONTOLOGIA'];
 
-// Cada item del array de medicamentos tiene muchos campos opcionales;
+
 // passthrough() preserva los que no se declaran aqui para que el service los reciba.
+const numField = z.union([z.number(), z.string()])
+  .transform((v) => (v === '' || v == null ? null : Number(v)))
+  .refine((v) => v === null || (!isNaN(v) && v >= 0), { message: 'Debe ser un número no negativo.' })
+  .nullable().optional();
+
 const itemSchema = z.object({
   nombre:            z.string({ required_error: 'El nombre del item es obligatorio.' }).min(1).max(300),
-  cant_recepcionada: z.number().nonnegative('cant_recepcionada no puede ser negativa.').nullable().optional(),
-  cant_solicitada:   z.number().nonnegative().nullable().optional(),
-  precio_unitario:   z.number().nonnegative().nullable().optional(),
+  cant_recepcionada: numField,
+  cant_solicitada:   numField,
+  precio_unitario:   numField,
 }).passthrough();
 
 // Usada tanto en POST /borrador como en POST /
 const recepcionBodySchema = z.object({
   tipo_recepcion:        z.enum(TIPOS_RECEPCION, {
                            errorMap: () => ({ message: `tipo_recepcion invalido. Valores: ${TIPOS_RECEPCION.join(', ')}.` }),
-                         }),
+                         }).optional(),
   fecha:                 z.string().optional().nullable(),
   hora:                  z.string().optional().nullable(),
   municipio_id:          z.number().int().positive().optional().nullable(),
